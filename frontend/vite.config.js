@@ -20,10 +20,21 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-charts': ['recharts'],
-          'vendor-icons': ['lucide-react'],
-          'vendor-axios': ['axios']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('victory-vendor') || id.includes('d3-')) {
+              return 'vendor-d3';
+            }
+            if (id.includes('recharts')) {
+              return 'vendor-recharts';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('axios')) {
+              return 'vendor-axios';
+            }
+          }
         }
       }
     }
