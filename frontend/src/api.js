@@ -14,7 +14,7 @@ const api = axios.create({
 export const getHealth = () => api.get('/health').then(res => res.data);
 
 // Dashboard
-export const getDashboard = () => api.get('/dashboard').then(res => res.data);
+export const getDashboard = (params = {}) => api.get('/dashboard', { params }).then(res => res.data);
 
 // Products
 export const getProducts = (search = '', category = '') => {
@@ -33,8 +33,8 @@ export const updateProduct = (id, productData) => api.put(`/products/${id}`, pro
 export const deleteProduct = (id) => api.delete(`/products/${id}`);
 
 // Inventory Operations & Ledger
-export const getMovements = (productId = null, movementType = '') => {
-  const params = {};
+export const getMovements = (productId = null, movementType = '', extraParams = {}) => {
+  const params = { ...extraParams };
   if (productId) params.productId = productId;
   if (movementType && movementType.trim()) params.movementType = movementType.trim();
   return api.get('/movements', { params }).then(res => res.data);
@@ -56,8 +56,8 @@ export const getIntelligence = () => api.get('/intelligence').then(res => res.da
 export const getSalesIntelligence = () => api.get('/intelligence/sales').then(res => res.data);
 
 // Sales Management
-export const getSales = (status = '') => {
-  const params = {};
+export const getSales = (status = '', extraParams = {}) => {
+  const params = { ...extraParams };
   if (status && status.trim()) params.status = status.trim();
   return api.get('/sales', { params }).then(res => res.data);
 };
@@ -97,8 +97,8 @@ export const removeProductSupplier = (productId) =>
 export const getSupplierProducts = (id) => api.get(`/suppliers/${id}/products`).then(res => res.data);
 
 // Purchase Order Management
-export const getPurchaseOrders = (status = '', supplierId = null) => {
-  const params = {};
+export const getPurchaseOrders = (status = '', supplierId = null, extraParams = {}) => {
+  const params = { ...extraParams };
   if (status && status.trim()) params.status = status.trim();
   if (supplierId) params.supplierId = supplierId;
   return api.get('/purchase-orders', { params }).then(res => res.data);
@@ -120,5 +120,77 @@ export const receivePurchaseOrder = (id, receiptData) =>
 
 export const cancelPurchaseOrder = (id, reason = '') =>
   api.post(`/purchase-orders/${id}/cancel`, { reason }).then(res => res.data);
+
+// Stock Auditing
+export const getStockAuditSummary = () => api.get('/stock-audits/summary').then(res => res.data);
+
+export const getStockAudits = (params = {}) => api.get('/stock-audits', { params }).then(res => res.data);
+
+export const getStockAuditById = (id) => api.get(`/stock-audits/${id}`).then(res => res.data);
+
+export const createStockAudit = (auditData) =>
+  api.post('/stock-audits', auditData).then(res => res.data);
+
+export const enterAuditCount = (auditId, itemId, countData) =>
+  api.put(`/stock-audits/${auditId}/items/${itemId}`, countData).then(res => res.data);
+
+export const completeStockAudit = (id) =>
+  api.post(`/stock-audits/${id}/complete`).then(res => res.data);
+
+export const cancelStockAudit = (id, reason = '') =>
+  api.post(`/stock-audits/${id}/cancel`, { reason }).then(res => res.data);
+
+// Financial Reports & Analytics
+export const getFinancialSummaryReport = (params = {}) =>
+  api.get('/reports/summary', { params }).then(res => res.data);
+
+export const getProfitLossReport = (params = {}) =>
+  api.get('/reports/profit-loss', { params }).then(res => res.data);
+
+export const getSalesReport = (params = {}) =>
+  api.get('/reports/sales', { params }).then(res => res.data);
+
+export const getInventoryLossReport = (params = {}) =>
+  api.get('/reports/inventory-loss', { params }).then(res => res.data);
+
+export const getPurchasesReport = (params = {}) =>
+  api.get('/reports/purchases', { params }).then(res => res.data);
+
+// Operating Expenses
+export const getExpenses = (params = {}) => api.get('/expenses', { params }).then(res => res.data);
+
+export const createExpense = (expenseData) =>
+  api.post('/expenses', expenseData).then(res => res.data);
+
+export const updateExpense = (id, expenseData) =>
+  api.put(`/expenses/${id}`, expenseData).then(res => res.data);
+
+export const deleteExpense = (id) =>
+  api.delete(`/expenses/${id}`);
+
+// Surplus Stock Management
+export const getSurplusSuggestions = () =>
+  api.get('/surplus-listings/suggestions').then(res => res.data);
+
+export const getSurplusSummary = () =>
+  api.get('/surplus-listings/summary').then(res => res.data);
+
+export const getSurplusListings = (params = {}) =>
+  api.get('/surplus-listings', { params }).then(res => res.data);
+
+export const getSurplusListingById = (id) =>
+  api.get(`/surplus-listings/${id}`).then(res => res.data);
+
+export const createSurplusListing = (listingData) =>
+  api.post('/surplus-listings', listingData).then(res => res.data);
+
+export const updateSurplusListing = (id, listingData) =>
+  api.put(`/surplus-listings/${id}`, listingData).then(res => res.data);
+
+export const recordSurplusSale = (id, saleData) =>
+  api.post(`/surplus-listings/${id}/sell`, saleData).then(res => res.data);
+
+export const cancelSurplusListing = (id, cancelData = {}) =>
+  api.post(`/surplus-listings/${id}/cancel`, cancelData).then(res => res.data);
 
 export default api;

@@ -46,6 +46,29 @@ CREATE TABLE IF NOT EXISTS sales (
     cancelled_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS surplus_listings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    product_name_snapshot TEXT NOT NULL,
+    sku_snapshot TEXT NOT NULL,
+    quantity_listed INTEGER NOT NULL CHECK (quantity_listed > 0),
+    quantity_sold INTEGER NOT NULL DEFAULT 0 CHECK (quantity_sold >= 0),
+    regular_unit_price_paise INTEGER NOT NULL CHECK (regular_unit_price_paise >= 0),
+    discounted_unit_price_paise INTEGER NOT NULL CHECK (discounted_unit_price_paise > 0),
+    unit_cost_paise_snapshot INTEGER NOT NULL CHECK (unit_cost_paise_snapshot >= 0),
+    reason TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'PARTIALLY_SOLD', 'SOLD', 'CANCELLED')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_surplus_listings_product_id ON surplus_listings(product_id);
+CREATE INDEX IF NOT EXISTS idx_surplus_listings_status ON surplus_listings(status);
+CREATE INDEX IF NOT EXISTS idx_surplus_listings_created_at ON surplus_listings(created_at);
+
 CREATE TABLE IF NOT EXISTS sale_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sale_id INTEGER NOT NULL,
@@ -57,14 +80,17 @@ CREATE TABLE IF NOT EXISTS sale_items (
     unit_purchase_price_paise INTEGER NOT NULL CHECK (unit_purchase_price_paise >= 0),
     line_total_paise INTEGER NOT NULL CHECK (line_total_paise >= 0),
     line_cost_paise INTEGER NOT NULL CHECK (line_cost_paise >= 0),
+    surplus_listing_id INTEGER,
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id)
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    FOREIGN KEY (surplus_listing_id) REFERENCES surplus_listings(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at);
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sale_items_product_id ON sale_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_surplus_listing_id ON sale_items(surplus_listing_id);
 
 CREATE TABLE IF NOT EXISTS suppliers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,5 +151,46 @@ CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
 CREATE INDEX IF NOT EXISTS idx_po_created_at ON purchase_orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_po_items_po_id ON purchase_order_items(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_po_items_product_id ON purchase_order_items(product_id);
+
+CREATE TABLE IF NOT EXISTS stock_audits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'COMPLETED', 'CANCELLED')),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    cancelled_at TIMESTAMP,
+    cancellation_reason TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stock_audit_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    product_name_snapshot TEXT NOT NULL,
+    sku_snapshot TEXT NOT NULL,
+    system_quantity INTEGER NOT NULL CHECK (system_quantity >= 0),
+    counted_quantity INTEGER CHECK (counted_quantity IS NULL OR counted_quantity >= 0),
+    item_notes TEXT,
+    FOREIGN KEY (audit_id) REFERENCES stock_audits(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    UNIQUE (audit_id, product_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_audits_status ON stock_audits(status);
+CREATE INDEX IF NOT EXISTS idx_stock_audits_created_at ON stock_audits(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_audit_items_audit_id ON stock_audit_items(audit_id);
+CREATE INDEX IF NOT EXISTS idx_stock_audit_items_product_id ON stock_audit_items(product_id);
+
+CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    amount_paise INTEGER NOT NULL CHECK (amount_paise >= 0),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
+
+
 
 

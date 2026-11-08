@@ -61,8 +61,12 @@ public class StockpileController {
     @GetMapping("/movements")
     public List<StockpileService.RecentMovement> getMovements(
             @RequestParam(required = false) Long productId,
-            @RequestParam(required = false) String movementType) {
-        return stockpileService.getMovements(productId, movementType);
+            @RequestParam(required = false) String movementType,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return stockpileService.getMovements(productId, movementType, from, to, limit, offset);
     }
 
     @GetMapping("/products/{id}/movements")
@@ -103,8 +107,11 @@ public class StockpileController {
     // --- Dashboard Endpoint ---
 
     @GetMapping("/dashboard")
-    public StockpileService.DashboardResponse getDashboard() {
-        return stockpileService.getDashboard();
+    public StockpileService.DashboardResponse getDashboard(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        return stockpileService.getDashboard(period, from, to);
     }
 
     // --- Inventory Intelligence Endpoints ---
@@ -128,8 +135,13 @@ public class StockpileController {
     }
 
     @GetMapping("/sales")
-    public List<StockpileService.SaleSummary> getSales(@RequestParam(required = false) String status) {
-        return stockpileService.getSales(status);
+    public List<StockpileService.SaleSummary> getSales(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return stockpileService.getSales(status, from, to, limit, offset);
     }
 
     @GetMapping("/sales/summary")
@@ -215,8 +227,12 @@ public class StockpileController {
     @GetMapping("/purchase-orders")
     public List<StockpileService.PurchaseOrderSummary> getPurchaseOrders(
             @RequestParam(required = false) Long supplierId,
-            @RequestParam(required = false) String status) {
-        return stockpileService.getPurchaseOrders(supplierId, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return stockpileService.getPurchaseOrders(supplierId, status, from, to, limit, offset);
     }
 
     @GetMapping("/purchase-orders/{id}")
@@ -250,13 +266,209 @@ public class StockpileController {
         return stockpileService.cancelPurchaseOrder(id, req);
     }
 
+    // --- Stock Auditing Endpoints ---
+
+    @PostMapping("/stock-audits")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StockpileService.StockAuditDetails createStockAudit(
+            @RequestBody(required = false) StockpileService.CreateStockAuditRequest req) {
+        return stockpileService.createStockAudit(req);
+    }
+
+    @GetMapping("/stock-audits/summary")
+    public StockpileService.StockAuditMetricsSummary getStockAuditSummary() {
+        return stockpileService.getStockAuditSummary();
+    }
+
+    @GetMapping("/stock-audits")
+    public List<StockpileService.StockAuditSummary> getStockAudits(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        return stockpileService.getStockAudits(status, from, to);
+    }
+
+    @GetMapping("/stock-audits/{id}")
+    public StockpileService.StockAuditDetails getStockAuditById(@PathVariable Long id) {
+        return stockpileService.getStockAuditById(id);
+    }
+
+    @PutMapping("/stock-audits/{auditId}/items/{itemId}")
+    public StockpileService.StockAuditItemDetails enterCount(
+            @PathVariable Long auditId,
+            @PathVariable Long itemId,
+            @RequestBody StockpileService.EnterCountRequest req) {
+        return stockpileService.enterCount(auditId, itemId, req);
+    }
+
+    @PostMapping("/stock-audits/{id}/complete")
+    public StockpileService.StockAuditCompletionSummary completeStockAudit(@PathVariable Long id) {
+        return stockpileService.completeStockAudit(id);
+    }
+
+    @PostMapping("/stock-audits/{id}/cancel")
+    public StockpileService.StockAuditDetails cancelStockAudit(
+            @PathVariable Long id,
+            @RequestBody StockpileService.CancelStockAuditRequest req) {
+        return stockpileService.cancelStockAudit(id, req);
+    }
+
+    // --- Financial Reports Endpoints ---
+
+    @GetMapping("/reports/summary")
+    public StockpileService.FinancialSummaryReport getFinancialSummaryReport(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return stockpileService.getFinancialSummaryReport(period, from, to, date, month, year);
+    }
+
+    @GetMapping("/reports/profit-loss")
+    public StockpileService.ProfitLossReport getProfitLossReport(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return stockpileService.getProfitLossReport(period, from, to, date, month, year);
+    }
+
+    @GetMapping("/reports/sales")
+    public StockpileService.SalesReport getSalesReport(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return stockpileService.getSalesReport(period, from, to, date, month, year);
+    }
+
+    @GetMapping("/reports/inventory-loss")
+    public StockpileService.InventoryLossReport getInventoryLossReport(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return stockpileService.getInventoryLossReport(period, from, to, date, month, year);
+    }
+
+    @GetMapping("/reports/purchases")
+    public StockpileService.PurchasesReport getPurchasesReport(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        return stockpileService.getPurchasesReport(period, from, to, date, month, year);
+    }
+
+    // --- Expenses Endpoints ---
+
+    @PostMapping("/expenses")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StockpileService.ExpenseRecord createExpense(@RequestBody StockpileService.CreateExpenseRequest req) {
+        return stockpileService.createExpense(req);
+    }
+
+    @PutMapping("/expenses/{id}")
+    public StockpileService.ExpenseRecord updateExpense(
+            @PathVariable Long id,
+            @RequestBody StockpileService.CreateExpenseRequest req) {
+        return stockpileService.updateExpense(id, req);
+    }
+
+    @DeleteMapping("/expenses/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteExpense(@PathVariable Long id) {
+        stockpileService.deleteExpense(id);
+    }
+
+    @GetMapping("/expenses")
+    public List<StockpileService.ExpenseRecord> getExpenses(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return stockpileService.getExpenses(category, from, to, limit, offset);
+    }
+
+    public List<StockpileService.ExpenseRecord> getExpenses() {
+        return getExpenses(null, null, null, null, null);
+    }
+
+    // --- Surplus Stock Management Endpoints ---
+
+    @GetMapping("/surplus-listings/suggestions")
+    public List<StockpileService.SurplusSuggestion> getSurplusSuggestions() {
+        return stockpileService.getSurplusSuggestions();
+    }
+
+    @GetMapping("/surplus-listings/summary")
+    public StockpileService.SurplusSummary getSurplusSummary() {
+        return stockpileService.getSurplusSummary();
+    }
+
+    @GetMapping("/surplus-listings")
+    public List<StockpileService.SurplusListingDetails> getSurplusListings(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String search) {
+        return stockpileService.getSurplusListings(status, productId, category, search);
+    }
+
+    @GetMapping("/surplus-listings/{id}")
+    public StockpileService.SurplusListingDetails getSurplusListingById(@PathVariable Long id) {
+        return stockpileService.getSurplusListingById(id);
+    }
+
+    @PostMapping("/surplus-listings")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StockpileService.SurplusListingDetails createSurplusListing(
+            @RequestBody StockpileService.CreateSurplusListingRequest req) {
+        return stockpileService.createSurplusListing(req);
+    }
+
+    @PostMapping("/surplus-listings/{id}/sell")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StockpileService.SaleDetails recordSurplusSale(
+            @PathVariable Long id,
+            @RequestBody StockpileService.RecordSurplusSaleRequest req) {
+        return stockpileService.recordSurplusSale(id, req);
+    }
+
+    @PutMapping("/surplus-listings/{id}")
+    public StockpileService.SurplusListingDetails updateSurplusListing(
+            @PathVariable Long id,
+            @RequestBody StockpileService.UpdateSurplusListingRequest req) {
+        return stockpileService.updateSurplusListing(id, req);
+    }
+
+    @PostMapping("/surplus-listings/{id}/cancel")
+    public StockpileService.SurplusListingDetails cancelSurplusListing(
+            @PathVariable Long id,
+            @RequestBody StockpileService.CancelSurplusListingRequest req) {
+        return stockpileService.cancelSurplusListing(id, req);
+    }
+
     // --- Exception Handlers ---
 
     @ExceptionHandler({
         StockpileService.ProductNotFoundException.class,
         StockpileService.SaleNotFoundException.class,
         StockpileService.SupplierNotFoundException.class,
-        StockpileService.PurchaseOrderNotFoundException.class
+        StockpileService.PurchaseOrderNotFoundException.class,
+        StockpileService.StockAuditNotFoundException.class,
+        StockpileService.SurplusListingNotFoundException.class
     })
     public ResponseEntity<Map<String, String>> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
@@ -266,7 +478,9 @@ public class StockpileController {
         StockpileService.ProductConflictException.class,
         StockpileService.SaleConflictException.class,
         StockpileService.SupplierConflictException.class,
-        StockpileService.PurchaseOrderConflictException.class
+        StockpileService.PurchaseOrderConflictException.class,
+        StockpileService.StockAuditConflictException.class,
+        StockpileService.SurplusListingConflictException.class
     })
     public ResponseEntity<Map<String, String>> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
