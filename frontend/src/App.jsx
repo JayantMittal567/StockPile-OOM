@@ -267,6 +267,8 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const productSearchAbortRef = useRef(null);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL'); // ALL, IN_STOCK, LOW_STOCK, OUT_OF_STOCK
   const [productsPage, setProductsPage] = useState(1);
@@ -692,11 +694,17 @@ export default function App() {
   };
 
   const fetchProductsData = async (search = searchQuery, category = categoryFilter) => {
+    if (productSearchAbortRef.current) {
+      productSearchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    productSearchAbortRef.current = controller;
     setLoadingProducts(true);
     try {
-      const data = await getProducts(search, category);
+      const data = await getProducts(search, category, { signal: controller.signal });
       setProducts(data || []);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
       triggerAlert('error', 'Failed to load products: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoadingProducts(false);
@@ -835,20 +843,20 @@ export default function App() {
     }
   };
 
-  // Initial load
+  // Initial system health check
   useEffect(() => {
     fetchHealthData();
-    fetchDashboardData();
-    fetchProductsData('', '');
-    fetchSuppliersData('');
-    fetchSalesMetricsData();
-    fetchSalesTrendData();
-    fetchIntelligenceData();
-    fetchPurchaseOrdersData('ALL', '');
-    getSurplusSummary().then(setSurplusSummary).catch(() => {});
   }, []);
 
-  // Fetch data specific to tab changes
+  // Debounce product and SKU search by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch data specific to tab changes (without duplicate initial loads)
   useEffect(() => {
     if (activeTab === 'overview' || activeTab === 'dashboard') {
       fetchDashboardData();
@@ -858,7 +866,7 @@ export default function App() {
       fetchPurchaseOrdersData('ALL', '');
       getSurplusSummary().then(setSurplusSummary).catch(() => {});
     } else if (activeTab === 'products') {
-      fetchProductsData(searchQuery, categoryFilter);
+      fetchProductsData(debouncedSearchQuery, categoryFilter);
       if (suppliers.length === 0) fetchSuppliersData('');
     } else if (activeTab === 'sales') {
       fetchSalesData(salesStatusFilter);
@@ -884,6 +892,13 @@ export default function App() {
       fetchAllReportData();
     }
   }, [activeTab]);
+
+  // Refetch products when debounced search query or category filter changes
+  useEffect(() => {
+    if (activeTab === 'products') {
+      fetchProductsData(debouncedSearchQuery, categoryFilter);
+    }
+  }, [debouncedSearchQuery, categoryFilter]);
 
   useEffect(() => {
     if (activeTab === 'surplus') {

@@ -154,6 +154,16 @@ public class StockpileService {
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_sale_items_surplus_listing_id ON sale_items(surplus_listing_id);");
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);");
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_stock_audits_completed_at ON stock_audits(completed_at);");
+
+            // Performance Optimisation Composite & Expression Indexes
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_sales_created_at_expr ON sales(datetime(replace(created_at, 'T', ' ')));");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_sales_status_created ON sales(status, created_at);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_surplus_listings_status_created ON surplus_listings(status, created_at DESC);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_po_status_created ON purchase_orders(status, created_at DESC);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_prod_created ON stock_movements(product_id, created_at DESC);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_stock_audits_status_created ON stock_audits(status, created_at DESC);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_expenses_created_at_expr ON expenses(datetime(replace(created_at, 'T', ' ')));");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_expenses_category_created ON expenses(category, created_at DESC);");
         } catch (Exception ignored) {}
     }
 
@@ -622,55 +632,36 @@ public class StockpileService {
     public DashboardResponse getDashboard(String period, String fromStr, String toStr) {
         String summarySql = """
             SELECT 
-                COUNT(*) AS total_products,
-                COALESCE(SUM(quantity), 0) AS total_quantity,
-                COALESCE(SUM(quantity * purchase_price_paise), 0) AS inventory_value_paise,
-                COALESCE(SUM(CASE WHEN quantity <= min_stock_level THEN 1 ELSE 0 END), 0) AS low_stock_count,
-                COALESCE(SUM(CASE WHEN quantity = 0 THEN 1 ELSE 0 END), 0) AS out_of_stock_count
-            FROM products
+                (SELECT COUNT(*) FROM products) AS total_products,
+                (SELECT COALESCE(SUM(quantity), 0) FROM products) AS total_quantity,
+                (SELECT COALESCE(SUM(quantity * purchase_price_paise), 0) FROM products) AS inventory_value_paise,
+                (SELECT COALESCE(SUM(CASE WHEN quantity <= min_stock_level THEN 1 ELSE 0 END), 0) FROM products) AS low_stock_count,
+                (SELECT COALESCE(SUM(CASE WHEN quantity = 0 THEN 1 ELSE 0 END), 0) FROM products) AS out_of_stock_count,
+                (SELECT COUNT(*) FROM surplus_listings WHERE status IN ('ACTIVE', 'PARTIALLY_SOLD')) AS active_surplus,
+                (SELECT COUNT(*) FROM purchase_orders WHERE status IN ('DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED')) AS pending_po,
+                (SELECT COUNT(*) FROM stock_audits WHERE status = 'OPEN') AS open_audits
             """;
 
-        DashboardSummary rawSummary = jdbcTemplate.queryForObject(
-            summarySql,
-            (rs, rowNum) -> new DashboardSummary(
-                rs.getInt("total_products"),
-                rs.getInt("total_quantity"),
-                rs.getLong("inventory_value_paise"),
-                rs.getInt("low_stock_count"),
-                rs.getInt("out_of_stock_count")
-            )
-        );
+        DashboardSummary rawSummary = null;
+        int activeSurplusListings = 0;
+        int pendingPurchaseOrders = 0;
+        int openStockAudits = 0;
 
-        if (rawSummary == null) {
+        try {
+            var row = jdbcTemplate.queryForMap(summarySql);
+            rawSummary = new DashboardSummary(
+                ((Number) row.get("total_products")).intValue(),
+                ((Number) row.get("total_quantity")).intValue(),
+                ((Number) row.get("inventory_value_paise")).longValue(),
+                ((Number) row.get("low_stock_count")).intValue(),
+                ((Number) row.get("out_of_stock_count")).intValue()
+            );
+            activeSurplusListings = ((Number) row.get("active_surplus")).intValue();
+            pendingPurchaseOrders = ((Number) row.get("pending_po")).intValue();
+            openStockAudits = ((Number) row.get("open_audits")).intValue();
+        } catch (Exception e) {
             rawSummary = new DashboardSummary(0, 0, 0L, 0, 0);
         }
-
-        Integer activeSurplus = 0;
-        try {
-            activeSurplus = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM surplus_listings WHERE status IN ('ACTIVE', 'PARTIALLY_SOLD')",
-                Integer.class
-            );
-        } catch (Exception ignored) {}
-        int activeSurplusListings = (activeSurplus != null) ? activeSurplus : 0;
-
-        Integer pendingPo = 0;
-        try {
-            pendingPo = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM purchase_orders WHERE status IN ('DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED')",
-                Integer.class
-            );
-        } catch (Exception ignored) {}
-        int pendingPurchaseOrders = (pendingPo != null) ? pendingPo : 0;
-
-        Integer openAudits = 0;
-        try {
-            openAudits = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM stock_audits WHERE status = 'OPEN'",
-                Integer.class
-            );
-        } catch (Exception ignored) {}
-        int openStockAudits = (openAudits != null) ? openAudits : 0;
 
         LiveBusinessState liveState = new LiveBusinessState(
             rawSummary.totalProducts(),
@@ -2521,6 +2512,10 @@ public class StockpileService {
     }
 
     public List<StockAuditSummary> getStockAudits(String status, String fromStr, String toStr) {
+        return getStockAudits(status, fromStr, toStr, null, null);
+    }
+
+    public List<StockAuditSummary> getStockAudits(String status, String fromStr, String toStr, Integer limit, Integer offset) {
         StringBuilder sql = new StringBuilder("""
             SELECT sa.id,
                    sa.status,
@@ -2565,6 +2560,16 @@ public class StockpileService {
             GROUP BY sa.id
             ORDER BY sa.id DESC
             """);
+
+        if (limit != null && limit > 0) {
+            int effectiveLimit = Math.min(100, Math.max(1, limit));
+            sql.append(" LIMIT ?");
+            params.add(effectiveLimit);
+            if (offset != null && offset > 0) {
+                sql.append(" OFFSET ?");
+                params.add(offset);
+            }
+        }
 
         return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new StockAuditSummary(
             rs.getLong("id"),
@@ -3784,11 +3789,25 @@ public class StockpileService {
             }
         }
 
+        // Batch-load all active reserved surplus quantities in a single query (eliminates N+1 query loop)
+        Map<Long, Integer> reservedMap = new HashMap<>();
+        String reservedSql = """
+            SELECT product_id, COALESCE(SUM(quantity_listed - quantity_sold), 0) AS reserved_qty
+            FROM surplus_listings
+            WHERE status IN ('ACTIVE', 'PARTIALLY_SOLD')
+            GROUP BY product_id
+            """;
+        try {
+            jdbcTemplate.query(reservedSql, rs -> {
+                reservedMap.put(rs.getLong("product_id"), Math.max(0, rs.getInt("reserved_qty")));
+            });
+        } catch (Exception ignored) {}
+
         List<Product> products = getProducts(null, null);
         List<SurplusSuggestion> suggestions = new ArrayList<>();
 
         for (Product p : products) {
-            int reserved = getActiveReservedQuantity(p.id());
+            int reserved = reservedMap.getOrDefault(p.id(), 0);
             int available = Math.max(0, p.quantity() - reserved);
             int preferredStock = p.targetStockLevel();
 
@@ -3911,27 +3930,30 @@ public class StockpileService {
     }
 
     public List<SurplusListingDetails> getSurplusListings(String status, Long productId, String category, String search) {
+        return getSurplusListings(status, productId, category, search, null, null);
+    }
+
+    public List<SurplusListingDetails> getSurplusListings(String status, Long productId, String category, String search, Integer limit, Integer offset) {
         StringBuilder sql = new StringBuilder("""
             SELECT sl.*, p.category,
-                   COALESCE((
-                       SELECT SUM(si.line_total_paise)
-                       FROM sale_items si
-                       JOIN sales s ON si.sale_id = s.id
-                       WHERE si.surplus_listing_id = sl.id AND s.status = 'COMPLETED'
-                   ), 0) AS actual_revenue_paise,
-                   COALESCE((
-                       SELECT SUM(si.line_cost_paise)
-                       FROM sale_items si
-                       JOIN sales s ON si.sale_id = s.id
-                       WHERE si.surplus_listing_id = sl.id AND s.status = 'COMPLETED'
-                   ), 0) AS actual_cost_paise
+                   COALESCE(sales_agg.revenue_paise, 0) AS actual_revenue_paise,
+                   COALESCE(sales_agg.cost_paise, 0) AS actual_cost_paise
             FROM surplus_listings sl
             LEFT JOIN products p ON sl.product_id = p.id
+            LEFT JOIN (
+                SELECT si.surplus_listing_id,
+                       SUM(si.line_total_paise) AS revenue_paise,
+                       SUM(si.line_cost_paise) AS cost_paise
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.id
+                WHERE si.surplus_listing_id IS NOT NULL AND s.status = 'COMPLETED'
+                GROUP BY si.surplus_listing_id
+            ) sales_agg ON sl.id = sales_agg.surplus_listing_id
             WHERE 1=1
             """);
         List<Object> params = new ArrayList<>();
 
-        if (status != null && !status.trim().isEmpty()) {
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
             sql.append(" AND sl.status = ?");
             params.add(status.trim().toUpperCase());
         }
@@ -3952,6 +3974,16 @@ public class StockpileService {
 
         sql.append(" ORDER BY sl.created_at DESC, sl.id DESC");
 
+        if (limit != null && limit > 0) {
+            int effectiveLimit = Math.min(100, Math.max(1, limit));
+            sql.append(" LIMIT ?");
+            params.add(effectiveLimit);
+            if (offset != null && offset > 0) {
+                sql.append(" OFFSET ?");
+                params.add(offset);
+            }
+        }
+
         return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> mapSurplusListing(rs), params.toArray());
     }
 
@@ -3961,20 +3993,19 @@ public class StockpileService {
         }
         String sql = """
             SELECT sl.*, p.category,
-                   COALESCE((
-                       SELECT SUM(si.line_total_paise)
-                       FROM sale_items si
-                       JOIN sales s ON si.sale_id = s.id
-                       WHERE si.surplus_listing_id = sl.id AND s.status = 'COMPLETED'
-                   ), 0) AS actual_revenue_paise,
-                   COALESCE((
-                       SELECT SUM(si.line_cost_paise)
-                       FROM sale_items si
-                       JOIN sales s ON si.sale_id = s.id
-                       WHERE si.surplus_listing_id = sl.id AND s.status = 'COMPLETED'
-                   ), 0) AS actual_cost_paise
+                   COALESCE(sales_agg.revenue_paise, 0) AS actual_revenue_paise,
+                   COALESCE(sales_agg.cost_paise, 0) AS actual_cost_paise
             FROM surplus_listings sl
             LEFT JOIN products p ON sl.product_id = p.id
+            LEFT JOIN (
+                SELECT si.surplus_listing_id,
+                       SUM(si.line_total_paise) AS revenue_paise,
+                       SUM(si.line_cost_paise) AS cost_paise
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.id
+                WHERE si.surplus_listing_id IS NOT NULL AND s.status = 'COMPLETED'
+                GROUP BY si.surplus_listing_id
+            ) sales_agg ON sl.id = sales_agg.surplus_listing_id
             WHERE sl.id = ?
             """;
         List<SurplusListingDetails> results = jdbcTemplate.query(sql, (rs, rowNum) -> mapSurplusListing(rs), id);

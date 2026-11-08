@@ -18,6 +18,20 @@ public class StockpileController {
         this.stockpileService = stockpileService;
     }
 
+    private static int[] resolvePagination(Integer limit, Integer offset, Integer page, Integer size) {
+        if (size != null && size > 0) {
+            int effectiveLimit = Math.min(100, Math.max(1, size));
+            int p = (page != null && page >= 0) ? page : 0;
+            return new int[]{effectiveLimit, p * effectiveLimit};
+        }
+        if (limit != null && limit > 0) {
+            int effectiveLimit = Math.min(100, Math.max(1, limit));
+            int off = (offset != null && offset > 0) ? offset : 0;
+            return new int[]{effectiveLimit, off};
+        }
+        return null;
+    }
+
     @GetMapping("/health")
     public StockpileService.HealthStatus getHealth() {
         return stockpileService.checkHealth();
@@ -65,8 +79,11 @@ public class StockpileController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Integer offset) {
-        return stockpileService.getMovements(productId, movementType, from, to, limit, offset);
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getMovements(productId, movementType, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     @GetMapping("/products/{id}/movements")
@@ -140,8 +157,11 @@ public class StockpileController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Integer offset) {
-        return stockpileService.getSales(status, from, to, limit, offset);
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getSales(status, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     @GetMapping("/sales/summary")
@@ -231,8 +251,11 @@ public class StockpileController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Integer offset) {
-        return stockpileService.getPurchaseOrders(supplierId, status, from, to, limit, offset);
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getPurchaseOrders(supplierId, status, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     @GetMapping("/purchase-orders/{id}")
@@ -284,8 +307,13 @@ public class StockpileController {
     public List<StockpileService.StockAuditSummary> getStockAudits(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
-        return stockpileService.getStockAudits(status, from, to);
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getStockAudits(status, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     @GetMapping("/stock-audits/{id}")
@@ -397,12 +425,15 @@ public class StockpileController {
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) Integer offset) {
-        return stockpileService.getExpenses(category, from, to, limit, offset);
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getExpenses(category, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     public List<StockpileService.ExpenseRecord> getExpenses() {
-        return getExpenses(null, null, null, null, null);
+        return getExpenses(null, null, null, null, null, null, null);
     }
 
     // --- Surplus Stock Management Endpoints ---
@@ -422,8 +453,13 @@ public class StockpileController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) String search) {
-        return stockpileService.getSurplusListings(status, productId, category, search);
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        int[] pag = resolvePagination(limit, offset, page, size);
+        return stockpileService.getSurplusListings(status, productId, category, search, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
     @GetMapping("/surplus-listings/{id}")
