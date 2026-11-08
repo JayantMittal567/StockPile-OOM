@@ -6,6 +6,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -131,8 +133,27 @@ public class StockpileService {
                 jdbcTemplate.execute("ALTER TABLE sale_items ADD COLUMN surplus_listing_id INTEGER REFERENCES surplus_listings(id);");
             } catch (Exception ignored) {}
         }
+
+        boolean hasDiscountPercentBasisPoints = false;
+        try {
+            List<Map<String, Object>> salesColumns = jdbcTemplate.queryForList("PRAGMA table_info(sales)");
+            for (Map<String, Object> col : salesColumns) {
+                if ("discount_percent_basis_points".equalsIgnoreCase((String) col.get("name"))) {
+                    hasDiscountPercentBasisPoints = true;
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        if (!hasDiscountPercentBasisPoints) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE sales ADD COLUMN discount_percent_basis_points INTEGER;");
+            } catch (Exception ignored) {}
+        }
         try {
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_sale_items_surplus_listing_id ON sale_items(surplus_listing_id);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);");
+            jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_stock_audits_completed_at ON stock_audits(completed_at);");
         } catch (Exception ignored) {}
     }
 
@@ -1192,9 +1213,28 @@ public class StockpileService {
             );
         }
 
-        long discountPaise = req.discountPaise() != null ? req.discountPaise() : 0L;
-        if (discountPaise < 0) {
-            throw new IllegalArgumentException("Discount cannot be negative");
+        // Validate discount fields (mutually exclusive)
+        if (req.discountPercent() != null && req.discountPaise() != null) {
+            throw new IllegalArgumentException("Cannot specify both discountPercent and discountPaise");
+        }
+
+        Integer discountPercentBasisPoints = null;
+        if (req.discountPercent() != null) {
+            BigDecimal pct = req.discountPercent();
+            if (pct.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Discount percentage cannot be negative: " + pct);
+            }
+            if (pct.compareTo(new BigDecimal("100")) > 0) {
+                throw new IllegalArgumentException("Discount percentage cannot exceed 100%: " + pct);
+            }
+            if (pct.stripTrailingZeros().scale() > 2) {
+                throw new IllegalArgumentException("Discount percentage cannot have more than 2 decimal places: " + pct);
+            }
+            discountPercentBasisPoints = pct.multiply(new BigDecimal("100")).setScale(0, RoundingMode.HALF_UP).intValueExact();
+        } else if (req.discountPaise() != null) {
+            if (req.discountPaise() < 0) {
+                throw new IllegalArgumentException("Discount cannot be negative");
+            }
         }
 
         Set<Long> seenProductIds = new HashSet<>();
@@ -1204,6 +1244,14 @@ public class StockpileService {
             }
             if (item.quantity() == null || item.quantity() <= 0) {
                 throw new IllegalArgumentException("Item quantity must be a positive integer");
+            }
+            if (item.unitSellingPricePaise() != null) {
+                if (item.unitSellingPricePaise() < 0) {
+                    throw new IllegalArgumentException("Selling price cannot be negative: " + item.unitSellingPricePaise());
+                }
+                if (item.unitSellingPricePaise() > 100_000_000_00L) {
+                    throw new IllegalArgumentException("Selling price exceeds maximum allowed value: " + item.unitSellingPricePaise());
+                }
             }
             if (!seenProductIds.add(item.productId())) {
                 throw new IllegalArgumentException("Duplicate product ID " + item.productId() + " in cart items");
@@ -1216,7 +1264,8 @@ public class StockpileService {
             long unitSellingPricePaise,
             long unitPurchasePricePaise,
             long lineTotalPaise,
-            long lineCostPaise
+            long lineCostPaise,
+            boolean belowCost
         ) {}
 
         List<PreparedItem> preparedItems = new ArrayList<>();
@@ -1235,19 +1284,33 @@ public class StockpileService {
                 );
             }
 
-            long unitSelling = product.sellingPricePaise();
+            long unitSelling = itemReq.unitSellingPricePaise() != null
+                ? itemReq.unitSellingPricePaise()
+                : product.sellingPricePaise();
             long unitPurchase = product.purchasePricePaise();
             long lineTotal = (long) itemReq.quantity() * unitSelling;
             long lineCost = (long) itemReq.quantity() * unitPurchase;
+            boolean belowCost = unitSelling < unitPurchase;
 
             subtotalPaise += lineTotal;
             totalCostPaise += lineCost;
 
-            preparedItems.add(new PreparedItem(product, itemReq.quantity(), unitSelling, unitPurchase, lineTotal, lineCost));
+            preparedItems.add(new PreparedItem(product, itemReq.quantity(), unitSelling, unitPurchase, lineTotal, lineCost, belowCost));
         }
 
-        if (discountPaise > subtotalPaise) {
-            throw new IllegalArgumentException("Discount cannot exceed subtotal (" + subtotalPaise + " paise)");
+        long discountPaise;
+        if (req.discountPercent() != null) {
+            BigDecimal subtotalBd = BigDecimal.valueOf(subtotalPaise);
+            discountPaise = subtotalBd.multiply(req.discountPercent())
+                .divide(new BigDecimal("100"), 0, RoundingMode.HALF_UP)
+                .longValueExact();
+        } else if (req.discountPaise() != null) {
+            discountPaise = req.discountPaise();
+            if (discountPaise > subtotalPaise) {
+                throw new IllegalArgumentException("Discount cannot exceed subtotal (" + subtotalPaise + " paise)");
+            }
+        } else {
+            discountPaise = 0L;
         }
 
         long totalPaise = subtotalPaise - discountPaise;
@@ -1255,15 +1318,16 @@ public class StockpileService {
 
         String insertSaleSql = """
             INSERT INTO sales (
-                subtotal_paise, discount_paise, total_paise, total_cost_paise,
+                subtotal_paise, discount_paise, discount_percent_basis_points, total_paise, total_cost_paise,
                 gross_profit_paise, payment_method, status
-            ) VALUES (?, ?, ?, ?, ?, ?, 'COMPLETED')
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED')
             """;
 
         jdbcTemplate.update(
             insertSaleSql,
             subtotalPaise,
             discountPaise,
+            discountPercentBasisPoints,
             totalPaise,
             totalCostPaise,
             grossProfitPaise,
@@ -1331,7 +1395,7 @@ public class StockpileService {
 
     public List<SaleSummary> getSales(String status) {
         StringBuilder sql = new StringBuilder("""
-            SELECT s.id, s.subtotal_paise, s.discount_paise, s.total_paise, s.total_cost_paise,
+            SELECT s.id, s.subtotal_paise, s.discount_paise, s.discount_percent_basis_points, s.total_paise, s.total_cost_paise,
                    s.gross_profit_paise, s.payment_method, s.status, s.created_at, s.cancelled_at,
                    COUNT(si.id) AS item_count,
                    COALESCE(SUM(si.quantity), 0) AS total_quantity
@@ -1350,26 +1414,34 @@ public class StockpileService {
             ORDER BY s.id DESC
             """);
 
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new SaleSummary(
-            rs.getLong("id"),
-            rs.getLong("id"),
-            rs.getLong("subtotal_paise"),
-            rs.getLong("discount_paise"),
-            rs.getLong("total_paise"),
-            rs.getLong("total_cost_paise"),
-            rs.getLong("gross_profit_paise"),
-            rs.getString("payment_method"),
-            rs.getString("status"),
-            rs.getString("created_at"),
-            rs.getString("cancelled_at"),
-            rs.getInt("item_count"),
-            rs.getInt("total_quantity")
-        ), params.toArray());
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            Integer basisPoints = hasColumn(rs, "discount_percent_basis_points") && rs.getObject("discount_percent_basis_points") != null
+                ? rs.getInt("discount_percent_basis_points")
+                : null;
+            Double discountPercent = basisPoints != null ? basisPoints / 100.0 : null;
+            return new SaleSummary(
+                rs.getLong("id"),
+                rs.getLong("id"),
+                rs.getLong("subtotal_paise"),
+                rs.getLong("discount_paise"),
+                basisPoints,
+                discountPercent,
+                rs.getLong("total_paise"),
+                rs.getLong("total_cost_paise"),
+                rs.getLong("gross_profit_paise"),
+                rs.getString("payment_method"),
+                rs.getString("status"),
+                rs.getString("created_at"),
+                rs.getString("cancelled_at"),
+                rs.getInt("item_count"),
+                rs.getInt("total_quantity")
+            );
+        }, params.toArray());
     }
 
     public List<SaleSummary> getSales(String status, String fromStr, String toStr, Integer limit, Integer offset) {
         StringBuilder sql = new StringBuilder("""
-            SELECT s.id, s.subtotal_paise, s.discount_paise, s.total_paise, s.total_cost_paise,
+            SELECT s.id, s.subtotal_paise, s.discount_paise, s.discount_percent_basis_points, s.total_paise, s.total_cost_paise,
                    s.gross_profit_paise, s.payment_method, s.status, s.created_at, s.cancelled_at,
                    COUNT(si.id) AS item_count,
                    COALESCE(SUM(si.quantity), 0) AS total_quantity
@@ -1413,21 +1485,29 @@ public class StockpileService {
             }
         }
 
-        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> new SaleSummary(
-            rs.getLong("id"),
-            rs.getLong("id"),
-            rs.getLong("subtotal_paise"),
-            rs.getLong("discount_paise"),
-            rs.getLong("total_paise"),
-            rs.getLong("total_cost_paise"),
-            rs.getLong("gross_profit_paise"),
-            rs.getString("payment_method"),
-            rs.getString("status"),
-            rs.getString("created_at"),
-            rs.getString("cancelled_at"),
-            rs.getInt("item_count"),
-            rs.getInt("total_quantity")
-        ), params.toArray());
+        return jdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+            Integer basisPoints = hasColumn(rs, "discount_percent_basis_points") && rs.getObject("discount_percent_basis_points") != null
+                ? rs.getInt("discount_percent_basis_points")
+                : null;
+            Double discountPercent = basisPoints != null ? basisPoints / 100.0 : null;
+            return new SaleSummary(
+                rs.getLong("id"),
+                rs.getLong("id"),
+                rs.getLong("subtotal_paise"),
+                rs.getLong("discount_paise"),
+                basisPoints,
+                discountPercent,
+                rs.getLong("total_paise"),
+                rs.getLong("total_cost_paise"),
+                rs.getLong("gross_profit_paise"),
+                rs.getString("payment_method"),
+                rs.getString("status"),
+                rs.getString("created_at"),
+                rs.getString("cancelled_at"),
+                rs.getInt("item_count"),
+                rs.getInt("total_quantity")
+            );
+        }, params.toArray());
     }
 
     public SalesMetricsSummary getSalesMetricsSummary() {
@@ -1493,26 +1573,35 @@ public class StockpileService {
 
     public SaleDetails getSaleById(Long id) {
         String saleSql = """
-            SELECT id, subtotal_paise, discount_paise, total_paise, total_cost_paise,
+            SELECT id, subtotal_paise, discount_paise, discount_percent_basis_points, total_paise, total_cost_paise,
                    gross_profit_paise, payment_method, status, created_at, cancelled_at
             FROM sales
             WHERE id = ?
             """;
 
-        List<SaleDetails> sales = jdbcTemplate.query(saleSql, (rs, rowNum) -> new SaleDetails(
-            rs.getLong("id"),
-            rs.getLong("id"),
-            rs.getLong("subtotal_paise"),
-            rs.getLong("discount_paise"),
-            rs.getLong("total_paise"),
-            rs.getLong("total_cost_paise"),
-            rs.getLong("gross_profit_paise"),
-            rs.getString("payment_method"),
-            rs.getString("status"),
-            rs.getString("created_at"),
-            rs.getString("cancelled_at"),
-            new ArrayList<>()
-        ), id);
+        List<SaleDetails> sales = jdbcTemplate.query(saleSql, (rs, rowNum) -> {
+            Integer basisPoints = hasColumn(rs, "discount_percent_basis_points") && rs.getObject("discount_percent_basis_points") != null
+                ? rs.getInt("discount_percent_basis_points")
+                : null;
+            Double discountPercent = basisPoints != null ? basisPoints / 100.0 : null;
+            return new SaleDetails(
+                rs.getLong("id"),
+                rs.getLong("id"),
+                rs.getLong("subtotal_paise"),
+                rs.getLong("discount_paise"),
+                basisPoints,
+                discountPercent,
+                rs.getLong("total_paise"),
+                rs.getLong("total_cost_paise"),
+                rs.getLong("gross_profit_paise"),
+                rs.getString("payment_method"),
+                rs.getString("status"),
+                rs.getString("created_at"),
+                rs.getString("cancelled_at"),
+                new ArrayList<>(),
+                false
+            );
+        }, id);
 
         if (sales.isEmpty()) {
             throw new SaleNotFoundException("Sale not found with id: " + id);
@@ -1529,27 +1618,36 @@ public class StockpileService {
             ORDER BY id ASC
             """;
 
-        List<SaleItemDetails> items = jdbcTemplate.query(itemsSql, (rs, rowNum) -> new SaleItemDetails(
-            rs.getLong("id"),
-            rs.getLong("sale_id"),
-            rs.getLong("product_id"),
-            rs.getString("product_name_snapshot"),
-            rs.getString("sku_snapshot"),
-            rs.getInt("quantity"),
-            rs.getLong("unit_selling_price_paise"),
-            rs.getLong("unit_purchase_price_paise"),
-            rs.getLong("line_total_paise"),
-            rs.getLong("line_cost_paise"),
-            hasColumn(rs, "surplus_listing_id") && rs.getObject("surplus_listing_id") != null
-                ? rs.getLong("surplus_listing_id")
-                : null
-        ), id);
+        List<SaleItemDetails> items = jdbcTemplate.query(itemsSql, (rs, rowNum) -> {
+            long unitSelling = rs.getLong("unit_selling_price_paise");
+            long unitPurchase = rs.getLong("unit_purchase_price_paise");
+            return new SaleItemDetails(
+                rs.getLong("id"),
+                rs.getLong("sale_id"),
+                rs.getLong("product_id"),
+                rs.getString("product_name_snapshot"),
+                rs.getString("sku_snapshot"),
+                rs.getInt("quantity"),
+                unitSelling,
+                unitPurchase,
+                rs.getLong("line_total_paise"),
+                rs.getLong("line_cost_paise"),
+                hasColumn(rs, "surplus_listing_id") && rs.getObject("surplus_listing_id") != null
+                    ? rs.getLong("surplus_listing_id")
+                    : null,
+                unitSelling < unitPurchase
+            );
+        }, id);
+
+        boolean hasBelowCost = items.stream().anyMatch(i -> Boolean.TRUE.equals(i.belowCost()));
 
         return new SaleDetails(
             baseSale.id(),
             baseSale.saleId(),
             baseSale.subtotalPaise(),
             baseSale.discountPaise(),
+            baseSale.discountPercentBasisPoints(),
+            baseSale.discountPercent(),
             baseSale.totalPaise(),
             baseSale.totalCostPaise(),
             baseSale.grossProfitPaise(),
@@ -1557,7 +1655,8 @@ public class StockpileService {
             baseSale.status(),
             baseSale.createdAt(),
             baseSale.cancelledAt(),
-            items
+            items,
+            hasBelowCost
         );
     }
 
@@ -3298,7 +3397,7 @@ public class StockpileService {
 
     private List<SaleSummary> getSalesInRange(String startUtc, String endUtc) {
         String sql = """
-            SELECT s.id, s.subtotal_paise, s.discount_paise, s.total_paise, s.total_cost_paise,
+            SELECT s.id, s.subtotal_paise, s.discount_paise, s.discount_percent_basis_points, s.total_paise, s.total_cost_paise,
                    s.gross_profit_paise, s.payment_method, s.status, s.created_at, s.cancelled_at,
                    COUNT(si.id) AS item_count,
                    COALESCE(SUM(si.quantity), 0) AS total_quantity
@@ -3311,21 +3410,29 @@ public class StockpileService {
             ORDER BY s.id DESC
             """;
 
-        return jdbcTemplate.query(sql, (rs, rowNum) -> new SaleSummary(
-            rs.getLong("id"),
-            rs.getLong("id"),
-            rs.getLong("subtotal_paise"),
-            rs.getLong("discount_paise"),
-            rs.getLong("total_paise"),
-            rs.getLong("total_cost_paise"),
-            rs.getLong("gross_profit_paise"),
-            rs.getString("payment_method"),
-            rs.getString("status"),
-            rs.getString("created_at"),
-            rs.getString("cancelled_at"),
-            rs.getInt("item_count"),
-            rs.getInt("total_quantity")
-        ), startUtc, endUtc);
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Integer basisPoints = hasColumn(rs, "discount_percent_basis_points") && rs.getObject("discount_percent_basis_points") != null
+                ? rs.getInt("discount_percent_basis_points")
+                : null;
+            Double discountPercent = basisPoints != null ? basisPoints / 100.0 : null;
+            return new SaleSummary(
+                rs.getLong("id"),
+                rs.getLong("id"),
+                rs.getLong("subtotal_paise"),
+                rs.getLong("discount_paise"),
+                basisPoints,
+                discountPercent,
+                rs.getLong("total_paise"),
+                rs.getLong("total_cost_paise"),
+                rs.getLong("gross_profit_paise"),
+                rs.getString("payment_method"),
+                rs.getString("status"),
+                rs.getString("created_at"),
+                rs.getString("cancelled_at"),
+                rs.getInt("item_count"),
+                rs.getInt("total_quantity")
+            );
+        }, startUtc, endUtc);
     }
 
     public FinancialSummaryReport getFinancialSummaryReport(String period, String fromStr, String toStr, String dateStr, Integer month, Integer year) {
@@ -4429,13 +4536,52 @@ public class StockpileService {
     public record CreateSaleRequest(
         List<SaleItemRequest> items,
         Long discountPaise,
+        BigDecimal discountPercent,
         String paymentMethod
-    ) {}
+    ) {
+        public CreateSaleRequest(List<SaleItemRequest> items, Long discountPaise, String paymentMethod) {
+            this(items, discountPaise, null, paymentMethod);
+        }
+
+        public CreateSaleRequest(List<SaleItemRequest> items, BigDecimal discountPercent, String paymentMethod) {
+            this(items, null, discountPercent, paymentMethod);
+        }
+
+        public CreateSaleRequest(List<SaleItemRequest> items, Double discountPercent, String paymentMethod) {
+            this(items, null, discountPercent != null ? BigDecimal.valueOf(discountPercent) : null, paymentMethod);
+        }
+
+        public CreateSaleRequest(List<SaleItemRequest> items, Integer discountPercent, String paymentMethod) {
+            this(items, null, discountPercent != null ? BigDecimal.valueOf(discountPercent) : null, paymentMethod);
+        }
+
+        public CreateSaleRequest(List<SaleItemRequest> items, String paymentMethod) {
+            this(items, null, null, paymentMethod);
+        }
+    }
 
     public record SaleItemRequest(
         Long productId,
-        Integer quantity
-    ) {}
+        Integer quantity,
+        Long unitSellingPricePaise
+    ) {
+        public SaleItemRequest(Long productId, Integer quantity) {
+            this(productId, quantity, null);
+        }
+    }
+
+    public record CreateSaleItemRequest(
+        Long productId,
+        Integer quantity,
+        Long unitSellingPricePaise
+    ) {
+        public CreateSaleItemRequest(Long productId, Integer quantity) {
+            this(productId, quantity, null);
+        }
+        public SaleItemRequest toSaleItemRequest() {
+            return new SaleItemRequest(productId, quantity, unitSellingPricePaise);
+        }
+    }
 
     public record CancelSaleRequest(
         String reason
@@ -4446,6 +4592,8 @@ public class StockpileService {
         Long saleId,
         long subtotalPaise,
         long discountPaise,
+        Integer discountPercentBasisPoints,
+        Double discountPercent,
         long totalPaise,
         long totalCostPaise,
         long grossProfitPaise,
@@ -4455,13 +4603,33 @@ public class StockpileService {
         String cancelledAt,
         int itemCount,
         int totalQuantity
-    ) {}
+    ) {
+        public SaleSummary(
+            Long id,
+            Long saleId,
+            long subtotalPaise,
+            long discountPaise,
+            long totalPaise,
+            long totalCostPaise,
+            long grossProfitPaise,
+            String paymentMethod,
+            String status,
+            String createdAt,
+            String cancelledAt,
+            int itemCount,
+            int totalQuantity
+        ) {
+            this(id, saleId, subtotalPaise, discountPaise, null, null, totalPaise, totalCostPaise, grossProfitPaise, paymentMethod, status, createdAt, cancelledAt, itemCount, totalQuantity);
+        }
+    }
 
     public record SaleDetails(
         Long id,
         Long saleId,
         long subtotalPaise,
         long discountPaise,
+        Integer discountPercentBasisPoints,
+        Double discountPercent,
         long totalPaise,
         long totalCostPaise,
         long grossProfitPaise,
@@ -4469,8 +4637,77 @@ public class StockpileService {
         String status,
         String createdAt,
         String cancelledAt,
-        List<SaleItemDetails> items
-    ) {}
+        List<SaleItemDetails> items,
+        Boolean hasBelowCostItem
+    ) {
+        public SaleDetails(
+            Long id,
+            Long saleId,
+            long subtotalPaise,
+            long discountPaise,
+            long totalPaise,
+            long totalCostPaise,
+            long grossProfitPaise,
+            String paymentMethod,
+            String status,
+            String createdAt,
+            String cancelledAt,
+            List<SaleItemDetails> items
+        ) {
+            this(
+                id,
+                saleId,
+                subtotalPaise,
+                discountPaise,
+                null,
+                null,
+                totalPaise,
+                totalCostPaise,
+                grossProfitPaise,
+                paymentMethod,
+                status,
+                createdAt,
+                cancelledAt,
+                items,
+                items != null && items.stream().anyMatch(i -> Boolean.TRUE.equals(i.belowCost()))
+            );
+        }
+
+        public SaleDetails(
+            Long id,
+            Long saleId,
+            long subtotalPaise,
+            long discountPaise,
+            Integer discountPercentBasisPoints,
+            Double discountPercent,
+            long totalPaise,
+            long totalCostPaise,
+            long grossProfitPaise,
+            String paymentMethod,
+            String status,
+            String createdAt,
+            String cancelledAt,
+            List<SaleItemDetails> items
+        ) {
+            this(
+                id,
+                saleId,
+                subtotalPaise,
+                discountPaise,
+                discountPercentBasisPoints,
+                discountPercent,
+                totalPaise,
+                totalCostPaise,
+                grossProfitPaise,
+                paymentMethod,
+                status,
+                createdAt,
+                cancelledAt,
+                items,
+                items != null && items.stream().anyMatch(i -> Boolean.TRUE.equals(i.belowCost()))
+            );
+        }
+    }
 
     public record SaleItemDetails(
         Long id,
@@ -4483,8 +4720,25 @@ public class StockpileService {
         long unitPurchasePricePaise,
         long lineTotalPaise,
         long lineCostPaise,
-        Long surplusListingId
+        Long surplusListingId,
+        Boolean belowCost
     ) {
+        public SaleItemDetails(
+            Long id,
+            Long saleId,
+            Long productId,
+            String productNameSnapshot,
+            String skuSnapshot,
+            int quantity,
+            long unitSellingPricePaise,
+            long unitPurchasePricePaise,
+            long lineTotalPaise,
+            long lineCostPaise,
+            Long surplusListingId
+        ) {
+            this(id, saleId, productId, productNameSnapshot, skuSnapshot, quantity, unitSellingPricePaise, unitPurchasePricePaise, lineTotalPaise, lineCostPaise, surplusListingId, unitSellingPricePaise < unitPurchasePricePaise);
+        }
+
         public SaleItemDetails(
             Long id,
             Long saleId,
@@ -4497,7 +4751,7 @@ public class StockpileService {
             long lineTotalPaise,
             long lineCostPaise
         ) {
-            this(id, saleId, productId, productNameSnapshot, skuSnapshot, quantity, unitSellingPricePaise, unitPurchasePricePaise, lineTotalPaise, lineCostPaise, null);
+            this(id, saleId, productId, productNameSnapshot, skuSnapshot, quantity, unitSellingPricePaise, unitPurchasePricePaise, lineTotalPaise, lineCostPaise, null, unitSellingPricePaise < unitPurchasePricePaise);
         }
     }
 

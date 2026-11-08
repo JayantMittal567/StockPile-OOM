@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     subtotal_paise INTEGER NOT NULL CHECK (subtotal_paise >= 0),
     discount_paise INTEGER NOT NULL DEFAULT 0 CHECK (discount_paise >= 0),
+    discount_percent_basis_points INTEGER,
     total_paise INTEGER NOT NULL CHECK (total_paise >= 0),
     total_cost_paise INTEGER NOT NULL CHECK (total_cost_paise >= 0),
     gross_profit_paise INTEGER NOT NULL,
@@ -178,6 +179,7 @@ CREATE TABLE IF NOT EXISTS stock_audit_items (
 
 CREATE INDEX IF NOT EXISTS idx_stock_audits_status ON stock_audits(status);
 CREATE INDEX IF NOT EXISTS idx_stock_audits_created_at ON stock_audits(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_audits_completed_at ON stock_audits(completed_at);
 CREATE INDEX IF NOT EXISTS idx_stock_audit_items_audit_id ON stock_audit_items(audit_id);
 CREATE INDEX IF NOT EXISTS idx_stock_audit_items_product_id ON stock_audit_items(product_id);
 
@@ -190,6 +192,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 );
 
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
+CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 
 
 

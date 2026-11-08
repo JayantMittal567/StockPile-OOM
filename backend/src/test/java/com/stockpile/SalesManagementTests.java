@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,6 +34,7 @@ public class SalesManagementTests {
         jdbcTemplate.update("DELETE FROM product_suppliers");
         jdbcTemplate.update("DELETE FROM suppliers");
         jdbcTemplate.update("DELETE FROM sale_items");
+        jdbcTemplate.update("DELETE FROM surplus_listings");
         jdbcTemplate.update("DELETE FROM sales");
         jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM products");
@@ -722,5 +724,473 @@ public class SalesManagementTests {
 
         assertEquals("OUT_OF_STOCK", item.status());
         assertEquals("Restock this product immediately.", item.recommendation());
+    }
+
+    // ==========================================
+    // SALES FLEXIBILITY & CHECKOUT IMPROVEMENT TESTS (1 to 23)
+    // ==========================================
+
+    @Test
+    @DisplayName("Flex 1. Normal sale without price override")
+    void testNormalSaleWithoutPriceOverride() {
+        StockpileService.Product p = createTestProduct("Standard Mug", "MUG-001", "Kitchen", 5000L, 12000L, 20);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2)),
+            "CASH"
+        ));
+
+        assertEquals(24000L, sale.subtotalPaise());
+        assertEquals(0L, sale.discountPaise());
+        assertEquals(24000L, sale.totalPaise());
+        assertEquals(1, sale.items().size());
+        assertEquals(12000L, sale.items().get(0).unitSellingPricePaise());
+        assertEquals(24000L, sale.items().get(0).lineTotalPaise());
+        assertFalse(Boolean.TRUE.equals(sale.items().get(0).belowCost()));
+        assertFalse(Boolean.TRUE.equals(sale.hasBelowCostItem()));
+    }
+
+    @Test
+    @DisplayName("Flex 2. Sale with per-item price override")
+    void testSaleWithPerItemPriceOverride() {
+        StockpileService.Product p = createTestProduct("Custom Bottle", "BTL-002", "Kitchen", 4000L, 10000L, 20);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2, 8500L)),
+            "UPI"
+        ));
+
+        assertEquals(17000L, sale.subtotalPaise());
+        assertEquals(0L, sale.discountPaise());
+        assertEquals(17000L, sale.totalPaise());
+        assertEquals(8500L, sale.items().get(0).unitSellingPricePaise());
+        assertEquals(17000L, sale.items().get(0).lineTotalPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 3. Verify product master price remains unchanged")
+    void testProductMasterPriceRemainsUnchanged() {
+        StockpileService.Product p = createTestProduct("Master Plate", "PLT-003", "Kitchen", 3000L, 7500L, 15);
+        service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 3, 5000L)),
+            "CARD"
+        ));
+
+        StockpileService.Product fetched = service.getProductById(p.id());
+        assertEquals(7500L, fetched.sellingPricePaise(), "Master product selling price must remain completely unchanged");
+        assertEquals(3000L, fetched.purchasePricePaise(), "Master product purchase price must remain completely unchanged");
+        assertEquals(12, fetched.quantity(), "Physical stock must be decremented by sale quantity");
+    }
+
+    @Test
+    @DisplayName("Flex 4. Multi-product sale with different custom prices")
+    void testMultiProductSaleWithDifferentCustomPrices() {
+        StockpileService.Product p1 = createTestProduct("Pen", "PEN-004", "Stationery", 1000L, 2500L, 30);
+        StockpileService.Product p2 = createTestProduct("Notebook", "NB-004", "Stationery", 4000L, 8000L, 20);
+        StockpileService.Product p3 = createTestProduct("Eraser", "ERS-004", "Stationery", 500L, 1000L, 50);
+
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(
+                new StockpileService.SaleItemRequest(p1.id(), 4, 2000L),
+                new StockpileService.SaleItemRequest(p2.id(), 2),
+                new StockpileService.SaleItemRequest(p3.id(), 5, 800L)
+            ),
+            "UPI"
+        ));
+
+        assertEquals(28000L, sale.subtotalPaise());
+        assertEquals(28000L, sale.totalPaise());
+        assertEquals(3, sale.items().size());
+        assertEquals(8000L, sale.items().get(0).lineTotalPaise());
+        assertEquals(16000L, sale.items().get(1).lineTotalPaise());
+        assertEquals(4000L, sale.items().get(2).lineTotalPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 5. Percentage discount of 5%")
+    void testPercentageDiscountFivePercent() {
+        StockpileService.Product p = createTestProduct("Shirt", "SHT-005", "Apparel", 20000L, 40000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+            BigDecimal.valueOf(5),
+            "CASH"
+        ));
+
+        assertEquals(40000L, sale.subtotalPaise());
+        assertEquals(2000L, sale.discountPaise(), "5% of 40000 is 2000 paise");
+        assertEquals(38000L, sale.totalPaise());
+        assertEquals(500, sale.discountPercentBasisPoints());
+        assertEquals(5.0, sale.discountPercent());
+    }
+
+    @Test
+    @DisplayName("Flex 6. Percentage discount of 10%")
+    void testPercentageDiscountTenPercent() {
+        StockpileService.Product p = createTestProduct("Pants", "PNT-006", "Apparel", 25000L, 50000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2)),
+            BigDecimal.valueOf(10),
+            "CARD"
+        ));
+
+        assertEquals(100000L, sale.subtotalPaise());
+        assertEquals(10000L, sale.discountPaise(), "10% of 100000 is 10000 paise");
+        assertEquals(90000L, sale.totalPaise());
+        assertEquals(1000, sale.discountPercentBasisPoints());
+        assertEquals(10.0, sale.discountPercent());
+    }
+
+    @Test
+    @DisplayName("Flex 7. Percentage discount of 12.5%")
+    void testPercentageDiscountTwelvePointFivePercent() {
+        StockpileService.Product p = createTestProduct("Jacket", "JKT-007", "Apparel", 40000L, 80000L, 5);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+            BigDecimal.valueOf(12.5),
+            "UPI"
+        ));
+
+        assertEquals(80000L, sale.subtotalPaise());
+        assertEquals(10000L, sale.discountPaise());
+        assertEquals(70000L, sale.totalPaise());
+        assertEquals(1250, sale.discountPercentBasisPoints());
+        assertEquals(12.5, sale.discountPercent());
+    }
+
+    @Test
+    @DisplayName("Flex 8. Percentage discount of 100%")
+    void testPercentageDiscountOneHundredPercent() {
+        StockpileService.Product p = createTestProduct("Gift Item", "GFT-008", "Gifts", 1500L, 3000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2)),
+            BigDecimal.valueOf(100),
+            "OTHER"
+        ));
+
+        assertEquals(6000L, sale.subtotalPaise());
+        assertEquals(6000L, sale.discountPaise());
+        assertEquals(0L, sale.totalPaise());
+        assertEquals(10000, sale.discountPercentBasisPoints());
+        assertEquals(100.0, sale.discountPercent());
+        assertEquals(-3000L, sale.grossProfitPaise(), "Gross profit is Total (0) - COGS (3000) = -3000");
+    }
+
+    @Test
+    @DisplayName("Flex 9. Reject negative discount")
+    void testRejectNegativeDiscount() {
+        StockpileService.Product p = createTestProduct("Item A", "ITM-009", "General", 1000L, 2000L, 10);
+
+        IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+                BigDecimal.valueOf(-5),
+                "CASH"
+            ))
+        );
+        assertTrue(ex1.getMessage().contains("negative"), "Should reject negative discount percentage");
+
+        IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+                -500L,
+                "CASH"
+            ))
+        );
+        assertTrue(ex2.getMessage().contains("negative"), "Should reject negative legacy discount paise");
+    }
+
+    @Test
+    @DisplayName("Flex 10. Reject discount above 100%")
+    void testRejectDiscountAboveOneHundredPercent() {
+        StockpileService.Product p = createTestProduct("Item B", "ITM-010", "General", 1000L, 2000L, 10);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+                BigDecimal.valueOf(100.01),
+                "CASH"
+            ))
+        );
+        assertTrue(ex.getMessage().contains("exceed 100%"), "Should reject discount exceeding 100%");
+    }
+
+    @Test
+    @DisplayName("Flex 11. Reject invalid monetary values")
+    void testRejectInvalidMonetaryValues() {
+        StockpileService.Product p = createTestProduct("Item C", "ITM-011", "General", 1000L, 2000L, 10);
+
+        assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1, -100L)),
+                "CASH"
+            ))
+        );
+
+        assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+                new BigDecimal("12.345"),
+                "CASH"
+            ))
+        );
+    }
+
+    @Test
+    @DisplayName("Flex 12. Verify rounding to paise")
+    void testVerifyRoundingToPaise() {
+        StockpileService.Product p1 = createTestProduct("Item D1", "ITM-012A", "General", 100L, 333L, 10);
+        StockpileService.SaleDetails s1 = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p1.id(), 1)),
+            BigDecimal.valueOf(10),
+            "CASH"
+        ));
+        assertEquals(333L, s1.subtotalPaise());
+        assertEquals(33L, s1.discountPaise(), "333 * 0.10 = 33.3 -> rounds to 33 paise");
+        assertEquals(300L, s1.totalPaise());
+
+        StockpileService.Product p2 = createTestProduct("Item D2", "ITM-012B", "General", 100L, 335L, 10);
+        StockpileService.SaleDetails s2 = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p2.id(), 1)),
+            BigDecimal.valueOf(10),
+            "CASH"
+        ));
+        assertEquals(335L, s2.subtotalPaise());
+        assertEquals(34L, s2.discountPaise(), "335 * 0.10 = 33.5 -> rounds to 34 paise");
+        assertEquals(301L, s2.totalPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 13. Verify correct subtotal")
+    void testVerifyCorrectSubtotal() {
+        StockpileService.Product p1 = createTestProduct("Item E1", "ITM-013A", "General", 2000L, 5000L, 10);
+        StockpileService.Product p2 = createTestProduct("Item E2", "ITM-013B", "General", 3000L, 6000L, 10);
+
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(
+                new StockpileService.SaleItemRequest(p1.id(), 3, 4500L),
+                new StockpileService.SaleItemRequest(p2.id(), 2, 5500L)
+            ),
+            "UPI"
+        ));
+
+        assertEquals(24500L, sale.subtotalPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 14. Verify correct discount amount")
+    void testVerifyCorrectDiscountAmount() {
+        StockpileService.Product p = createTestProduct("Item F", "ITM-014", "General", 5000L, 15000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2)),
+            new BigDecimal("15.75"),
+            "CARD"
+        ));
+
+        assertEquals(30000L, sale.subtotalPaise());
+        assertEquals(4725L, sale.discountPaise());
+        assertEquals(1575, sale.discountPercentBasisPoints());
+        assertEquals(15.75, sale.discountPercent());
+
+        StockpileService.SaleDetails fetched = service.getSaleById(sale.id());
+        assertEquals(4725L, fetched.discountPaise());
+        assertEquals(1575, fetched.discountPercentBasisPoints());
+        assertEquals(15.75, fetched.discountPercent());
+    }
+
+    @Test
+    @DisplayName("Flex 15. Verify final total")
+    void testVerifyFinalTotal() {
+        StockpileService.Product p = createTestProduct("Item G", "ITM-015", "General", 1000L, 5000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2, 4000L)),
+            BigDecimal.valueOf(20),
+            "CASH"
+        ));
+
+        assertEquals(8000L, sale.subtotalPaise());
+        assertEquals(1600L, sale.discountPaise());
+        assertEquals(6400L, sale.totalPaise());
+        assertEquals(sale.subtotalPaise() - sale.discountPaise(), sale.totalPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 16. Verify COGS")
+    void testVerifyCogs() {
+        StockpileService.Product p1 = createTestProduct("Item H1", "ITM-016A", "General", 2500L, 6000L, 10);
+        StockpileService.Product p2 = createTestProduct("Item H2", "ITM-016B", "General", 4000L, 9000L, 10);
+
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(
+                new StockpileService.SaleItemRequest(p1.id(), 2, 5000L),
+                new StockpileService.SaleItemRequest(p2.id(), 3, 7000L)
+            ),
+            "UPI"
+        ));
+
+        assertEquals(17000L, sale.totalCostPaise());
+        assertEquals(5000L, sale.items().get(0).lineCostPaise());
+        assertEquals(12000L, sale.items().get(1).lineCostPaise());
+    }
+
+    @Test
+    @DisplayName("Flex 17. Verify gross profit, including negative profit")
+    void testVerifyGrossProfitIncludingNegativeProfit() {
+        StockpileService.Product p = createTestProduct("Loss Leader", "ITM-017", "Grocery", 8000L, 10000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2, 5000L)),
+            "CASH"
+        ));
+
+        assertEquals(10000L, sale.totalPaise());
+        assertEquals(16000L, sale.totalCostPaise());
+        assertEquals(-6000L, sale.grossProfitPaise(), "Gross profit must allow negative value when sold below cost");
+        assertTrue(Boolean.TRUE.equals(sale.items().get(0).belowCost()), "Item must indicate belowCost = true");
+        assertTrue(Boolean.TRUE.equals(sale.hasBelowCostItem()), "SaleDetails must indicate hasBelowCostItem = true");
+    }
+
+    @Test
+    @DisplayName("Flex 18. Verify historical price snapshots after later product price changes")
+    void testHistoricalPriceSnapshotsAfterLaterProductPriceChanges() {
+        StockpileService.Product p = createTestProduct("Snapshot Item", "ITM-018", "Tech", 10000L, 20000L, 15);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2, 18000L)),
+            "UPI"
+        ));
+
+        service.updateProduct(p.id(), new StockpileService.UpdateProductRequest(
+            "Snapshot Item Renamed", "ITM-018", "Tech", 15000L, 35000L, 5, 20, 1.0, 5
+        ));
+
+        StockpileService.Product updatedProduct = service.getProductById(p.id());
+        assertEquals(35000L, updatedProduct.sellingPricePaise());
+        assertEquals(15000L, updatedProduct.purchasePricePaise());
+
+        StockpileService.SaleDetails historicalSale = service.getSaleById(sale.id());
+        assertEquals(36000L, historicalSale.subtotalPaise());
+        assertEquals(36000L, historicalSale.totalPaise());
+        assertEquals(20000L, historicalSale.totalCostPaise());
+        assertEquals(16000L, historicalSale.grossProfitPaise());
+        assertEquals(18000L, historicalSale.items().get(0).unitSellingPricePaise());
+        assertEquals(10000L, historicalSale.items().get(0).unitPurchasePricePaise());
+    }
+
+    @Test
+    @DisplayName("Flex 19. Verify legacy discountPaise requests remain compatible")
+    void testLegacyDiscountPaiseCompatibility() {
+        StockpileService.Product p = createTestProduct("Legacy Item", "ITM-019", "General", 2000L, 5000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 2)),
+            1500L,
+            "CASH"
+        ));
+
+        assertEquals(10000L, sale.subtotalPaise());
+        assertEquals(1500L, sale.discountPaise());
+        assertEquals(8500L, sale.totalPaise());
+        assertNull(sale.discountPercentBasisPoints(), "Legacy discountPaise request should have null basis points");
+        assertNull(sale.discountPercent(), "Legacy discountPaise request should have null discount percent");
+    }
+
+    @Test
+    @DisplayName("Flex 20. Reject ambiguous requests containing both discount fields")
+    void testRejectAmbiguousBothDiscountFields() {
+        StockpileService.Product p = createTestProduct("Item Both", "ITM-020", "General", 1000L, 4000L, 10);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 1)),
+                500L,
+                BigDecimal.valueOf(10),
+                "CASH"
+            ))
+        );
+        assertTrue(ex.getMessage().contains("both"), "Must reject request containing both discountPercent and discountPaise");
+    }
+
+    @Test
+    @DisplayName("Flex 21. Verify surplus sales remain correct")
+    void testSurplusSalesRemainCorrect() {
+        StockpileService.Product p = createTestProduct("Surplus Chair", "CHR-021", "Furniture", 10000L, 25000L, 20);
+
+        StockpileService.SurplusListingDetails listing = service.createSurplusListing(
+            new StockpileService.CreateSurplusListingRequest(
+                p.id(), 8, 18000L, "Overstock", "Special clearance"
+            )
+        );
+
+        StockpileService.SaleDetails surplusSale = service.recordSurplusSale(
+            listing.id(),
+            new StockpileService.RecordSurplusSaleRequest(3, "UPI")
+        );
+
+        assertEquals(54000L, surplusSale.subtotalPaise(), "3 * 18000 = 54000");
+        assertEquals(54000L, surplusSale.totalPaise());
+        assertEquals(30000L, surplusSale.totalCostPaise(), "3 * 10000 = 30000");
+        assertEquals(24000L, surplusSale.grossProfitPaise());
+        assertEquals(18000L, surplusSale.items().get(0).unitSellingPricePaise());
+        assertEquals(listing.id(), surplusSale.items().get(0).surplusListingId());
+
+        StockpileService.Product currentP = service.getProductById(p.id());
+        assertEquals(17, currentP.quantity());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            service.createSale(new StockpileService.CreateSaleRequest(
+                List.of(new StockpileService.SaleItemRequest(p.id(), 13, 20000L)),
+                "CASH"
+            ))
+        );
+    }
+
+    @Test
+    @DisplayName("Flex 22. Verify sale cancellation remains correct")
+    void testSaleCancellationRemainsCorrect() {
+        StockpileService.Product p = createTestProduct("Cancel Item", "CAN-022", "General", 3000L, 8000L, 10);
+        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p.id(), 3, 7000L)),
+            BigDecimal.valueOf(10),
+            "UPI"
+        ));
+
+        assertEquals(7, service.getProductById(p.id()).quantity());
+
+        StockpileService.SaleDetails cancelled = service.cancelSale(
+            sale.id(),
+            new StockpileService.CancelSaleRequest("Customer returned goods")
+        );
+
+        assertEquals("CANCELLED", cancelled.status());
+        assertNotNull(cancelled.cancelledAt());
+        assertEquals(10, service.getProductById(p.id()).quantity(), "Stock must be fully restored upon cancellation");
+
+        List<StockpileService.RecentMovement> movements = service.getMovements(p.id(), null);
+        assertTrue(movements.stream().anyMatch(m -> m.reason() != null && m.reason().contains("Cancelled")));
+    }
+
+    @Test
+    @DisplayName("Flex 23. Verify reports continue calculating correctly")
+    void testReportsContinueCalculatingCorrectly() {
+        StockpileService.Product p1 = createTestProduct("Report Widget A", "RPT-023A", "General", 2000L, 5000L, 50);
+        StockpileService.Product p2 = createTestProduct("Report Widget B", "RPT-023B", "General", 4000L, 10000L, 50);
+
+        service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p1.id(), 2, 4500L)),
+            BigDecimal.valueOf(10),
+            "CASH"
+        ));
+
+        service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(p2.id(), 1, 9000L)),
+            BigDecimal.valueOf(5),
+            "UPI"
+        ));
+
+        StockpileService.SalesMetricsSummary metrics = service.getSalesMetricsSummary();
+        assertNotNull(metrics);
+        assertEquals(2, metrics.totalSalesCount());
+        assertEquals(16650L, metrics.totalSalesPaise(), "8100 + 8550 = 16650");
+        assertEquals(8000L, metrics.totalCostPaise(), "4000 + 4000 = 8000");
+        assertEquals(8650L, metrics.totalProfitPaise(), "16650 - 8000 = 8650");
+
+        List<StockpileService.DailySalesTrend> trend = service.getDailySalesTrend();
+        assertFalse(trend.isEmpty());
+        assertTrue(trend.stream().anyMatch(t -> t.totalPaise() >= 16650L));
     }
 }
