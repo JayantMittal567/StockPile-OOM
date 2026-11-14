@@ -74,7 +74,7 @@ export default function Products({
                     <button
                       type="button"
                       onClick={() => openAddProductModal({}, 'EXISTING')}
-                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs shrink-0"
+                      className="px-3 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
                     >
                       <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Log Stock Record</span>
@@ -82,7 +82,7 @@ export default function Products({
                     <button
                       type="button"
                       onClick={() => openAddProductModal({}, 'NEW')}
-                      className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs shrink-0"
+                      className="px-3.5 py-2 bg-[#EA580C] hover:bg-[#C2410C] text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs shrink-0 cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Add Product</span>
@@ -97,9 +97,9 @@ export default function Products({
                     <button
                       key={st}
                       onClick={() => setStockStatusFilter(st)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
                         stockStatusFilter === st
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-[#EA580C] text-white font-bold shadow-xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
@@ -121,8 +121,8 @@ export default function Products({
                           setCategoryFilter('');
                           fetchProductsData(searchQuery, '');
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
-                          !categoryFilter ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                          !categoryFilter ? 'bg-[#EA580C] text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
                         All
@@ -134,8 +134,8 @@ export default function Products({
                             setCategoryFilter(c);
                             fetchProductsData(searchQuery, c);
                           }}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
-                            categoryFilter === c ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                            categoryFilter === c ? 'bg-[#EA580C] text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
                           {c}

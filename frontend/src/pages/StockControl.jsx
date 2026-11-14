@@ -90,9 +90,9 @@ export default function StockControl({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setStockControlSubTab('movements')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                       stockControlSubTab === 'movements'
-                        ? 'bg-teal-600 text-white shadow-xs'
+                        ? 'bg-[#EA580C] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                   >
@@ -102,9 +102,9 @@ export default function StockControl({
 
                   <button
                     onClick={() => setStockControlSubTab('adjustments')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                       stockControlSubTab === 'adjustments'
-                        ? 'bg-teal-600 text-white shadow-xs'
+                        ? 'bg-[#EA580C] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                   >
@@ -114,9 +114,9 @@ export default function StockControl({
 
                   <button
                     onClick={() => setStockControlSubTab('audits')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                       stockControlSubTab === 'audits'
-                        ? 'bg-teal-600 text-white shadow-xs'
+                        ? 'bg-[#EA580C] text-white shadow-xs'
                         : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
                     }`}
                   >
@@ -158,9 +158,9 @@ export default function StockControl({
                               setMovementsPage(1);
                               fetchMovementsData(movementProductFilter, type);
                             }}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${
+                            className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
                               movementTypeFilter === type
-                                ? 'bg-slate-900 text-white'
+                                ? 'bg-[#EA580C] text-white font-bold shadow-xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
@@ -561,9 +561,9 @@ export default function StockControl({
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 text-xs font-semibold">
                           <button
                             onClick={() => setAuditItemFilter('ALL')}
-                            className={`px-3 py-1.5 rounded-xl transition ${
+                            className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                               auditItemFilter === 'ALL'
-                                ? 'bg-slate-900 text-white'
+                                ? 'bg-[#EA580C] text-white font-bold shadow-xs'
                                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                           >
@@ -836,9 +836,9 @@ export default function StockControl({
                                 setAuditFilter('ALL');
                                 setAuditsPage(1);
                               }}
-                              className={`px-3 py-1.5 rounded-xl transition ${
+                              className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
                                 auditFilter === 'ALL'
-                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  ? 'bg-[#EA580C] text-white font-bold shadow-xs'
                                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                               }`}
                             >

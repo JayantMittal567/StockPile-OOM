@@ -306,19 +306,19 @@ export default function Reports({
                 </div>
 
                 {/* 3. Net Revenue */}
-                <div className="p-4 bg-white rounded-2xl border border-teal-200/90 bg-teal-50/20 shadow-xs space-y-1">
+                <div className="p-4 bg-white rounded-2xl border border-teal-200/90 dark:border-teal-800/80 shadow-xs space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] sm:text-xs text-teal-800 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] sm:text-xs text-teal-800 dark:text-teal-300 font-bold uppercase tracking-wider">
                       Net Revenue
                     </span>
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 text-teal-800">
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-100 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
                       Authoritative
                     </span>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold font-mono text-teal-950 truncate">
+                  <div className="text-lg sm:text-xl font-bold font-mono text-teal-950 dark:text-teal-300 truncate">
                     {formatPaise(summaryReport?.netRevenuePaise || 0)}
                   </div>
-                  <p className="text-[10px] text-teal-700">{summaryReport?.completedSalesCount || 0} completed orders</p>
+                  <p className="text-[10px] text-teal-700 dark:text-teal-400 font-medium">{summaryReport?.completedSalesCount || 0} completed orders</p>
                 </div>
 
                 {/* 4. Cost of Goods Sold */}
@@ -375,25 +375,31 @@ export default function Reports({
                 </div>
 
                 {/* 8. Operating Result Before Tax */}
-                <div className={`p-4 rounded-2xl border shadow-xs space-y-1 ${
+                <div className={`p-4 bg-white rounded-2xl border shadow-xs space-y-1 ${
                   (summaryReport?.operatingResultPaise || 0) >= 0
-                    ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950'
-                    : 'bg-rose-50/50 border-rose-200 text-rose-950'
+                    ? 'border-emerald-200/90 dark:border-emerald-800/80'
+                    : 'border-rose-200/90 dark:border-rose-800/80'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-stone-300">
                       Operating Result
                     </span>
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                      (summaryReport?.operatingResultPaise || 0) >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      (summaryReport?.operatingResultPaise || 0) >= 0
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                        : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                     }`}>
                       {pnlReport?.netMarginPercentage ?? '0.0'}% Net
                     </span>
                   </div>
-                  <div className="text-lg sm:text-xl font-bold font-mono truncate">
+                  <div className={`text-lg sm:text-xl font-bold font-mono truncate ${
+                    (summaryReport?.operatingResultPaise || 0) >= 0
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-rose-700 dark:text-rose-400'
+                  }`}>
                     {formatPaise(summaryReport?.operatingResultPaise || 0)}
                   </div>
-                  <p className="text-[10px] text-slate-500">Gross profit - losses - expenses</p>
+                  <p className="text-[10px] text-slate-500 dark:text-stone-400">Gross profit - losses - expenses</p>
                 </div>
               </div>
 
