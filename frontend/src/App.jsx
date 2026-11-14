@@ -2342,8 +2342,46 @@ export default function App() {
   };
 
 
+  const [darkMode, setDarkMode] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark') ||
+        localStorage.getItem('stockpile-dark-mode') === 'true';
+    }
+    return false;
+  });
+
+  // Persist dark mode preference
+  React.useEffect(() => {
+    localStorage.setItem('stockpile-dark-mode', darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
+  // Sidebar dock/collapse state
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+
+  // Track previous tab for view transition
+  const prevTabRef = React.useRef(activeTab);
+  const [viewKey, setViewKey] = React.useState(0);
+
+  React.useEffect(() => {
+    if (prevTabRef.current !== activeTab) {
+      prevTabRef.current = activeTab;
+      setViewKey((k) => k + 1);
+    }
+  }, [activeTab]);
+
   return (
-    <div className="flex h-screen h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans text-slate-900 antialiased">
+    <div
+      className="flex h-screen h-[100dvh] w-full overflow-hidden font-sans antialiased"
+      style={{
+        backgroundColor: 'var(--bg-base)',
+        color: 'var(--text-primary)'
+      }}
+    >
       {/* ================= FIXED DESKTOP & MOBILE SIDEBAR ================= */}
       <Sidebar
         activeTab={activeTab}
@@ -2353,6 +2391,8 @@ export default function App() {
         health={health}
         loadingHealth={loadingHealth}
         fetchHealthData={fetchHealthData}
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
       />
 
       {/* ================= MAIN CONTENT WRAPPER ================= */}
@@ -2363,19 +2403,24 @@ export default function App() {
         {/* Top Header */}
         <Header
           activeTab={activeTab}
+          setActiveTab={setActiveTab}
           setMobileMenuOpen={setMobileMenuOpen}
           openNewSaleModal={openNewSaleModal}
           openNewPoModal={() => openNewPoModal()}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={setSidebarCollapsed}
         />
 
-        {/* Content Container */}
-        <main className="p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 flex-1">
+        {/* Content Container — fade+slide on workspace switch */}
+        <main key={viewKey} className="workspace-view-enter p-3.5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6 flex-1">
           <ErrorBoundary>
             <Suspense
               fallback={
                 <div className="flex flex-col items-center justify-center p-12 min-h-[350px] space-y-3">
-                  <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-xs font-semibold text-slate-500">Loading view...</span>
+                  <div className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--spinner-color)', borderTopColor: 'transparent' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Loading view...</span>
                 </div>
               }
             >
