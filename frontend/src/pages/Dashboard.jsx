@@ -61,6 +61,7 @@ export default function Dashboard({
   salesIntelligence,
   attentionItems = [],
   setActiveTab,
+  setStockControlSubTab = () => {},
   openAddProductModal,
   openNewSaleModal,
   openNewPoModal,
@@ -796,7 +797,10 @@ export default function Dashboard({
                     <p className="text-xs text-slate-500">Live transaction history</p>
                   </div>
                   <button
-                    onClick={() => setActiveTab('stock-control')}
+                    onClick={() => {
+                      setStockControlSubTab('movements');
+                      setActiveTab('stock-control');
+                    }}
                     className="text-xs font-semibold text-teal-600 hover:text-teal-700"
                   >
                     Full Ledger &rarr;

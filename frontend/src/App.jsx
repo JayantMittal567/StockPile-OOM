@@ -188,6 +188,10 @@ export default function App() {
   // 1. Product Modal
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [productRecordMode, setProductRecordMode] = useState('NEW'); // 'NEW' | 'EXISTING'
+  const [selectedExistingProductId, setSelectedExistingProductId] = useState('');
+  const [existingProductIntakeQty, setExistingProductIntakeQty] = useState(1);
+  const [existingProductIntakeReason, setExistingProductIntakeReason] = useState('Stock intake / restock');
   const [showAdvancedProduct, setShowAdvancedProduct] = useState(false);
   const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
   const [productForm, setProductForm] = useState({
@@ -707,10 +711,22 @@ export default function App() {
     }
   };
 
-  // Initial system health check
+  // Initial system health check and preloading catalog & suppliers
   useEffect(() => {
     fetchHealthData();
+    fetchProductsData('', '');
+    fetchSuppliersData('');
   }, []);
+
+  // Synchronize quick action default productId when products load
+  useEffect(() => {
+    if (products.length > 0 && !quickActionForm.productId) {
+      setQuickActionForm((prev) => ({
+        ...prev,
+        productId: prev.productId || String(products[0].id)
+      }));
+    }
+  }, [products]);
 
   // Debounce product and SKU search by 300ms
   useEffect(() => {
@@ -729,6 +745,8 @@ export default function App() {
       fetchIntelligenceData();
       fetchPurchaseOrdersData('ALL', '');
       getSurplusSummary().then(setSurplusSummary).catch(() => {});
+      if (products.length === 0) fetchProductsData('', '');
+      if (suppliers.length === 0) fetchSuppliersData('');
     } else if (activeTab === 'products') {
       fetchProductsData(debouncedSearchQuery, categoryFilter);
       if (suppliers.length === 0) fetchSuppliersData('');
@@ -907,10 +925,14 @@ export default function App() {
   // --- ACTIONS & MODAL HANDLERS ---
 
   // Product Add / Edit
-  const openAddProductModal = (prefill = {}) => {
+  const openAddProductModal = (prefill = {}, initialMode = null) => {
     setEditingProduct(null);
     setShowAdvancedProduct(false);
     setSkuManuallyEdited(false);
+    setProductRecordMode(initialMode || (products.length > 0 ? 'EXISTING' : 'NEW'));
+    setSelectedExistingProductId(products[0]?.id ? String(products[0].id) : '');
+    setExistingProductIntakeQty(1);
+    setExistingProductIntakeReason('Stock intake / restock');
     const initialSku = generateSuggestedSku(prefill.name || '', prefill.category || 'General');
     setProductForm({
       name: prefill.name || '',
@@ -965,6 +987,35 @@ export default function App() {
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     setProductFormError('');
+
+    // If recording a stock intake / transaction for an existing product
+    if (!editingProduct && productRecordMode === 'EXISTING') {
+      const pId = parseInt(selectedExistingProductId, 10);
+      const qty = parseInt(existingProductIntakeQty, 10);
+      if (!pId) {
+        setProductFormError('Please select an existing product from your catalog.');
+        return;
+      }
+      if (isNaN(qty) || qty <= 0) {
+        setProductFormError('Quantity must be greater than zero.');
+        return;
+      }
+      setSavingProduct(true);
+      try {
+        await stockIn(pId, qty, existingProductIntakeReason || 'Stock intake');
+        const prod = products.find((p) => p.id === pId);
+        triggerAlert('success', `Stock record added for "${prod?.name || 'Product'}" (+${qty} units).`);
+        setProductModalOpen(false);
+        fetchProductsData();
+        fetchDashboardData();
+        fetchMovementsData();
+      } catch (err) {
+        setProductFormError(err.response?.data?.error || err.message || 'Failed to record stock');
+      } finally {
+        setSavingProduct(false);
+      }
+      return;
+    }
 
     if (!productForm.name.trim()) {
       setProductFormError('Product Name is required.');
@@ -1054,8 +1105,20 @@ export default function App() {
   };
 
   // Quick Action Modal (Fast Receive, Sale, Adjust)
-  const openQuickActionModal = (action = 'RECEIVE', initialProductId = '') => {
-    const pId = initialProductId || (products.length > 0 ? String(products[0].id) : '');
+  const openQuickActionModal = async (action = 'RECEIVE', initialProductId = '') => {
+    let prods = products;
+    if (prods.length === 0) {
+      try {
+        const fetched = await getProducts();
+        if (fetched && fetched.length > 0) {
+          setProducts(fetched);
+          prods = fetched;
+        }
+      } catch (err) {
+        console.error('Failed to load products for quick action modal:', err);
+      }
+    }
+    const pId = initialProductId || (prods.length > 0 ? String(prods[0].id) : '');
     setQuickActionForm({
       action,
       productId: pId,
@@ -1238,14 +1301,26 @@ export default function App() {
   };
 
   // Sales Cart POS Modal
-  const openNewSaleModal = () => {
-    if (products.length === 0) {
+  const openNewSaleModal = async () => {
+    let prods = products;
+    if (prods.length === 0) {
+      try {
+        const fetched = await getProducts();
+        if (fetched && fetched.length > 0) {
+          setProducts(fetched);
+          prods = fetched;
+        }
+      } catch (err) {
+        console.error('Failed to load products for sale modal:', err);
+      }
+    }
+    if (prods.length === 0) {
       triggerAlert('error', 'Add products to your catalog before recording a sale.');
       return;
     }
     // If cart is empty, initialize with first product for convenience
-    if (saleCart.length === 0 && products.length > 0) {
-      setSaleCart([{ productId: products[0].id, quantity: 1, customPriceRupees: null }]);
+    if (saleCart.length === 0 && prods.length > 0) {
+      setSaleCart([{ productId: prods[0].id, quantity: 1, customPriceRupees: null }]);
     }
     setSaleDiscountPercent(0);
     setSaleFormError('');
@@ -1452,20 +1527,50 @@ export default function App() {
   };
 
   // Purchase Order Handlers
-  const openNewPoModal = (prefillProductId = null, prefillSupplierId = null, prefillQty = 10) => {
-    if (suppliers.length === 0) {
+  const openNewPoModal = async (prefillProductId = null, prefillSupplierId = null, prefillQty = 10) => {
+    let supps = suppliers;
+    if (supps.length === 0) {
+      try {
+        const fetchedSupps = await getSuppliers();
+        if (fetchedSupps && fetchedSupps.length > 0) {
+          setSuppliers(fetchedSupps);
+          supps = fetchedSupps;
+        }
+      } catch (err) {
+        console.error('Failed to load suppliers for PO modal:', err);
+      }
+    }
+    let prods = products;
+    if (prods.length === 0) {
+      try {
+        const fetchedProds = await getProducts();
+        if (fetchedProds && fetchedProds.length > 0) {
+          setProducts(fetchedProds);
+          prods = fetchedProds;
+        }
+      } catch (err) {
+        console.error('Failed to load products for PO modal:', err);
+      }
+    }
+
+    if (supps.length === 0) {
       triggerAlert('error', 'Please create a supplier before drafting purchase orders.');
       setActiveTab('purchasing');
       setPurchasingSubTab('suppliers');
       return;
     }
 
-    const targetSupplierId = prefillSupplierId || suppliers[0].id;
-    let initialItems = [{ productId: products[0]?.id || '', quantity: prefillQty, unitCostRupees: '' }];
+    const targetSupplierId = prefillSupplierId || supps[0].id;
+    const defaultProduct = prods[0];
+    let initialItems = [{
+      productId: defaultProduct?.id ? String(defaultProduct.id) : '',
+      quantity: prefillQty,
+      unitCostRupees: defaultProduct ? paiseToRupees(defaultProduct.purchasePricePaise) : ''
+    }];
     if (prefillProductId) {
-      const prod = products.find((p) => p.id === prefillProductId);
+      const prod = prods.find((p) => p.id === prefillProductId);
       initialItems = [{
-        productId: prefillProductId,
+        productId: String(prefillProductId),
         quantity: prefillQty,
         unitCostRupees: prod ? paiseToRupees(prod.purchasePricePaise) : ''
       }];
@@ -1482,9 +1587,17 @@ export default function App() {
   };
 
   const handleAddPoItemRow = () => {
+    const firstProd = products[0];
     setPoForm({
       ...poForm,
-      items: [...poForm.items, { productId: products[0]?.id || '', quantity: 10, unitCostRupees: '' }]
+      items: [
+        ...poForm.items,
+        {
+          productId: firstProd?.id ? String(firstProd.id) : '',
+          quantity: 10,
+          unitCostRupees: firstProd ? paiseToRupees(firstProd.purchasePricePaise) : ''
+        }
+      ]
     });
   };
 
@@ -1892,11 +2005,11 @@ export default function App() {
     rows.push(['Net Revenue', ((summaryReport?.netRevenuePaise || 0) / 100).toFixed(2), summaryReport?.netRevenuePaise || 0]);
     rows.push(['Cost of Goods Sold (COGS)', ((summaryReport?.cogsPaise || 0) / 100).toFixed(2), summaryReport?.cogsPaise || 0]);
     rows.push(['Gross Profit', ((summaryReport?.grossProfitPaise || 0) / 100).toFixed(2), summaryReport?.grossProfitPaise || 0]);
-    rows.push(['Gross Margin %', `${pnlReport?.grossMarginPercentage ?? 0}%`, '']);
+    rows.push(['Gross Margin %', `${Number(pnlReport?.grossMarginPercentage || 0).toFixed(2)}%`, '']);
     rows.push(['Total Inventory Loss', ((summaryReport?.inventoryLossPaise || 0) / 100).toFixed(2), summaryReport?.inventoryLossPaise || 0]);
     rows.push(['Operating Expenses', ((summaryReport?.operatingExpensesPaise || 0) / 100).toFixed(2), summaryReport?.operatingExpensesPaise || 0]);
     rows.push(['Operating Result Before Tax', ((summaryReport?.operatingResultPaise || 0) / 100).toFixed(2), summaryReport?.operatingResultPaise || 0]);
-    rows.push(['Net Margin %', `${pnlReport?.netMarginPercentage ?? 0}%`, '']);
+    rows.push(['Net Margin %', `${Number(pnlReport?.netMarginPercentage || 0).toFixed(2)}%`, '']);
     rows.push(['Total Purchases (Procurement)', ((summaryReport?.totalPurchasesPaise || 0) / 100).toFixed(2), summaryReport?.totalPurchasesPaise || 0]);
     rows.push(['Purchase Orders Count', summaryReport?.purchaseOrdersCount || 0, '']);
     rows.push(['Completed Sales Orders', summaryReport?.completedSalesCount || 0, '']);
@@ -1907,17 +2020,17 @@ export default function App() {
     rows.push(['Period', 'Gross Sales (INR)', 'Discounts (INR)', 'Net Revenue (INR)', 'COGS (INR)', 'Gross Profit (INR)', 'Loss (INR)', 'Expenses (INR)', 'Operating Result (INR)', 'Sales Count', 'Units Sold']);
     (summaryReport?.breakdown || []).forEach(b => {
       rows.push([
-        b.period,
-        (b.grossSalesPaise / 100).toFixed(2),
-        (b.discountsPaise / 100).toFixed(2),
-        (b.netRevenuePaise / 100).toFixed(2),
-        (b.cogsPaise / 100).toFixed(2),
-        (b.grossProfitPaise / 100).toFixed(2),
-        (b.inventoryLossPaise / 100).toFixed(2),
-        (b.operatingExpensesPaise / 100).toFixed(2),
-        (b.operatingResultPaise / 100).toFixed(2),
-        b.salesCount,
-        b.unitsSold
+        b.period || '',
+        ((b.grossSalesPaise || 0) / 100).toFixed(2),
+        ((b.discountsPaise || 0) / 100).toFixed(2),
+        ((b.netRevenuePaise || 0) / 100).toFixed(2),
+        ((b.cogsPaise || 0) / 100).toFixed(2),
+        ((b.grossProfitPaise || 0) / 100).toFixed(2),
+        ((b.inventoryLossPaise || 0) / 100).toFixed(2),
+        ((b.operatingExpensesPaise || 0) / 100).toFixed(2),
+        ((b.operatingResultPaise || 0) / 100).toFixed(2),
+        b.salesCount ?? 0,
+        b.unitsSold ?? 0
       ]);
     });
     rows.push([]);
@@ -1927,13 +2040,13 @@ export default function App() {
       rows.push(['Product Name', 'SKU', 'Category', 'Units Sold', 'Revenue (INR)', 'COGS (INR)', 'Gross Profit (INR)']);
       salesReport.topSellingProducts.forEach(tp => {
         rows.push([
-          tp.productName,
-          tp.sku,
-          tp.category,
-          tp.unitsSold,
-          (tp.totalRevenuePaise / 100).toFixed(2),
-          (tp.totalCostPaise / 100).toFixed(2),
-          (tp.grossProfitPaise / 100).toFixed(2)
+          tp.productName || '',
+          tp.sku || '',
+          tp.category || '',
+          tp.unitsSold ?? 0,
+          ((tp.totalRevenuePaise || 0) / 100).toFixed(2),
+          ((tp.totalCostPaise || 0) / 100).toFixed(2),
+          ((tp.grossProfitPaise || 0) / 100).toFixed(2)
         ]);
       });
       rows.push([]);
@@ -1944,14 +2057,14 @@ export default function App() {
       rows.push(['Movement ID', 'Product Name', 'SKU', 'Units Lost', 'Unit Cost (INR)', 'Total Loss (INR)', 'Reason', 'Created At']);
       lossReport.incidents.forEach(inc => {
         rows.push([
-          inc.movementId,
-          inc.productName,
-          inc.sku,
-          inc.unitsLost,
-          (inc.unitCostPaise / 100).toFixed(2),
-          (inc.totalLossPaise / 100).toFixed(2),
-          inc.reason,
-          inc.createdAt
+          inc.movementId || '',
+          inc.productName || '',
+          inc.sku || '',
+          inc.unitsLost ?? 0,
+          ((inc.unitCostPaise || 0) / 100).toFixed(2),
+          ((inc.totalLossPaise || 0) / 100).toFixed(2),
+          inc.reason || '',
+          formatDateTime(inc.createdAt)
         ]);
       });
       rows.push([]);
@@ -1962,24 +2075,56 @@ export default function App() {
       rows.push(['Order ID', 'Supplier', 'Status', 'Total Amount (INR)', 'Items', 'Ordered Qty', 'Received Qty', 'Created At']);
       purchasesReport.orders.forEach(po => {
         rows.push([
-          po.id,
-          po.supplierName,
-          po.status,
-          (po.totalAmountPaise / 100).toFixed(2),
-          po.itemCount,
-          po.totalQuantityOrdered,
-          po.totalQuantityReceived,
-          po.createdAt
+          po.id || '',
+          po.supplierName || '',
+          po.status || '',
+          ((po.totalAmountPaise || 0) / 100).toFixed(2),
+          po.itemCount ?? 0,
+          po.totalQuantityOrdered ?? 0,
+          po.totalQuantityReceived ?? 0,
+          formatDateTime(po.createdAt)
         ]);
       });
       rows.push([]);
     }
 
-    const csvContent = rows
-      .map(row => row.map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\n');
+    if (expenses?.length) {
+      rows.push(['6. OPERATING EXPENSES']);
+      rows.push(['Expense ID', 'Category', 'Description', 'Amount (INR)', 'Expense Date', 'Recorded At']);
+      expenses.forEach((exp) => {
+        rows.push([
+          exp.id || '',
+          exp.category || '',
+          exp.description || '',
+          ((exp.amountPaise || 0) / 100).toFixed(2),
+          exp.expenseDate || '',
+          formatDateTime(exp.createdAt)
+        ]);
+      });
+      rows.push([]);
+    }
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Determine max columns across all sections so every row has consistent column alignment
+    const maxCols = Math.max(...rows.map((r) => r.length), 1);
+
+    // Normalize each row with empty padding and RFC 4180 CSV escaping
+    const normalizedRows = rows.map((row) => {
+      const padding = maxCols - row.length;
+      const fullRow = padding > 0 ? [...row, ...Array(padding).fill('')] : row;
+      return fullRow
+        .map((val) => {
+          if (val === null || val === undefined) return '""';
+          const str = String(val);
+          return `"${str.replace(/"/g, '""')}"`;
+        })
+        .join(',');
+    });
+
+    // RFC 4180 CRLF row delimiter
+    const csvContent = normalizedRows.join('\r\n');
+
+    // Prepend UTF-8 BOM (\uFEFF) so Excel on Windows decodes UTF-8 cleanly without garbled characters or column breaks
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -2253,6 +2398,7 @@ export default function App() {
               salesIntelligence={salesIntelligence}
               attentionItems={attentionItems}
               setActiveTab={setActiveTab}
+              setStockControlSubTab={setStockControlSubTab}
               openAddProductModal={openAddProductModal}
               openNewSaleModal={openNewSaleModal}
               openNewPoModal={openNewPoModal}
@@ -2497,6 +2643,15 @@ export default function App() {
         handleSaveProduct={handleSaveProduct}
         suppliers={suppliers}
         setSkuManuallyEdited={setSkuManuallyEdited}
+        products={products}
+        productRecordMode={productRecordMode}
+        setProductRecordMode={setProductRecordMode}
+        selectedExistingProductId={selectedExistingProductId}
+        setSelectedExistingProductId={setSelectedExistingProductId}
+        existingProductIntakeQty={existingProductIntakeQty}
+        setExistingProductIntakeQty={setExistingProductIntakeQty}
+        existingProductIntakeReason={existingProductIntakeReason}
+        setExistingProductIntakeReason={setExistingProductIntakeReason}
       />
       <DeleteProductModal
         isOpen={deleteProductModalOpen}
