@@ -61,6 +61,7 @@ export default function Dashboard({
   salesIntelligence,
   attentionItems = [],
   setActiveTab,
+  setStockControlSubTab = () => {},
   openAddProductModal,
   openNewSaleModal,
   openNewPoModal,
@@ -162,10 +163,6 @@ export default function Dashboard({
                     </h3>
                     <p className="text-xs text-slate-500">Real-time status of catalog, stock levels, orders, and audits</p>
                   </div>
-                  <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></span>
-                    Live State
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -175,7 +172,7 @@ export default function Dashboard({
                       <span>Total Products</span>
                       <Package className="w-4 h-4 text-teal-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.liveState?.totalProducts ?? dashboard?.totalProducts ?? products.length}
                     </div>
                     <p className="text-[10px] text-slate-500">Catalog items</p>
@@ -187,7 +184,7 @@ export default function Dashboard({
                       <span>Total Physical Stock</span>
                       <Boxes className="w-4 h-4 text-teal-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.liveState?.totalQuantity ?? dashboard?.totalQuantity ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Physical units on hand</p>
@@ -199,7 +196,7 @@ export default function Dashboard({
                       <span>Current Inventory Value</span>
                       <TrendingUp className="w-4 h-4 text-teal-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono truncate">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatPaise(dashboard?.liveState?.inventoryValuePaise ?? dashboard?.inventoryValuePaise ?? 0)}
                     </div>
                     <p className="text-[10px] text-slate-500">Valued at purchase cost</p>
@@ -211,7 +208,7 @@ export default function Dashboard({
                       <span>Low-Stock Products</span>
                       <AlertTriangle className="w-4 h-4 text-amber-500" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums flex items-center gap-1.5" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       <span>{dashboard?.liveState?.lowStockCount ?? dashboard?.lowStockCount ?? 0}</span>
                       {(dashboard?.liveState?.lowStockCount > 0 || dashboard?.lowStockCount > 0) && (
                         <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-700 rounded">
@@ -228,7 +225,7 @@ export default function Dashboard({
                       <span>Out-of-Stock Products</span>
                       <AlertOctagon className="w-4 h-4 text-rose-500" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono flex items-center gap-1.5">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums flex items-center gap-1.5" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       <span>{dashboard?.liveState?.outOfStockCount ?? dashboard?.outOfStockCount ?? 0}</span>
                       {(dashboard?.liveState?.outOfStockCount > 0 || dashboard?.outOfStockCount > 0) && (
                         <span className="text-[10px] font-bold px-1.5 py-0.2 bg-rose-100 text-rose-700 rounded">
@@ -245,7 +242,7 @@ export default function Dashboard({
                       <span>Active Surplus Listings</span>
                       <Percent className="w-4 h-4 text-purple-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.liveState?.activeSurplusListings ?? dashboard?.summary?.activeSurplusListings ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Clearance listings</p>
@@ -257,7 +254,7 @@ export default function Dashboard({
                       <span>Pending Purchase Orders</span>
                       <Truck className="w-4 h-4 text-blue-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.liveState?.pendingPurchaseOrders ?? dashboard?.summary?.pendingPurchaseOrders ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Inbound restock orders</p>
@@ -269,7 +266,7 @@ export default function Dashboard({
                       <span>Open Stock Audits</span>
                       <ShieldAlert className="w-4 h-4 text-teal-600" />
                     </div>
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.liveState?.openStockAudits ?? dashboard?.summary?.openStockAudits ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Counts in progress</p>
@@ -356,10 +353,10 @@ export default function Dashboard({
                       <span>Sales</span>
                       <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono truncate">
+                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono tabular-nums truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatPaise(dashboard?.periodActivity?.salesPaise ?? salesMetrics?.salesTodayPaise ?? 0)}
                     </div>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[10px] text-slate-500 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.periodActivity?.completedSalesCount ?? salesMetrics?.salesTodayCount ?? 0} orders
                     </p>
                   </div>
@@ -370,7 +367,7 @@ export default function Dashboard({
                       <span>Gross Profit</span>
                       <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-emerald-700 font-mono truncate">
+                    <div className="text-lg sm:text-xl font-bold text-emerald-700 font-mono tabular-nums truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatPaise(dashboard?.periodActivity?.grossProfitPaise ?? 0)}
                     </div>
                     <p className="text-[10px] text-slate-500">Revenue minus COGS</p>
@@ -382,7 +379,7 @@ export default function Dashboard({
                       <span>Units Sold</span>
                       <Package className="w-3.5 h-3.5 text-indigo-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">
+                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.periodActivity?.unitsSold ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Quantity delivered</p>
@@ -394,7 +391,7 @@ export default function Dashboard({
                       <span>Expenses</span>
                       <Receipt className="w-3.5 h-3.5 text-amber-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-amber-800 font-mono truncate">
+                    <div className="text-lg sm:text-xl font-bold text-amber-800 font-mono tabular-nums truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatPaise(dashboard?.periodActivity?.expensesPaise ?? 0)}
                     </div>
                     <p className="text-[10px] text-slate-500">Operating costs</p>
@@ -406,7 +403,7 @@ export default function Dashboard({
                       <span>Loss Discovered</span>
                       <TrendingDown className="w-3.5 h-3.5 text-rose-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-rose-700 font-mono truncate">
+                    <div className="text-lg sm:text-xl font-bold text-rose-700 font-mono tabular-nums truncate" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatPaise(dashboard?.periodActivity?.inventoryLossPaise ?? 0)}
                     </div>
                     <p className="text-[10px] text-slate-500">Audits & write-downs</p>
@@ -418,7 +415,7 @@ export default function Dashboard({
                       <span>Discrepancies</span>
                       <SlidersHorizontal className="w-3.5 h-3.5 text-teal-600" />
                     </div>
-                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono">
+                    <div className="text-lg sm:text-xl font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.periodActivity?.discrepanciesCount ?? 0}
                     </div>
                     <p className="text-[10px] text-slate-500">Variances identified</p>
@@ -502,14 +499,16 @@ export default function Dashboard({
                       <p className="text-xs text-slate-500">Real transaction volume by day</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-bold text-slate-900">
+                      <span className="text-xs font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         Month: {formatPaise(salesMetrics?.salesMonthPaise ?? 0)}
                       </span>
-                      <p className="text-[10px] text-slate-400">{salesMetrics?.salesMonthCount ?? 0} total sales</p>
+                      <p className="text-[10px] text-slate-400 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {salesMetrics?.salesMonthCount ?? 0} total sales
+                      </p>
                     </div>
                   </div>
 
-                  <div className="h-56 w-full pt-2">
+                  <div className="h-56 w-full pt-2 chart-enter-animate">
                     {salesTrend.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-xs text-slate-400 bg-slate-50 rounded-xl">
                         <ShoppingCart className="w-6 h-6 text-slate-300 mb-1" />
@@ -533,7 +532,14 @@ export default function Dashboard({
                             labelFormatter={(lbl) => `Date: ${lbl}`}
                             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
                           />
-                          <Bar dataKey="totalPaise" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                          <Bar
+                            dataKey="totalPaise"
+                            fill="#4f46e5"
+                            radius={[4, 4, 0, 0]}
+                            isAnimationActive={true}
+                            animationDuration={380}
+                            animationEasing="ease-out"
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -549,25 +555,25 @@ export default function Dashboard({
                     <div className="space-y-2.5 text-xs">
                       <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
                         <span className="text-slate-600">Today's Revenue</span>
-                        <span className="font-bold text-slate-900 font-mono">
+                        <span className="font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {formatPaise(salesMetrics?.salesTodayPaise ?? 0)}
                         </span>
                       </div>
                       <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
                         <span className="text-slate-600">This Month's Revenue</span>
-                        <span className="font-bold text-slate-900 font-mono">
+                        <span className="font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {formatPaise(salesMetrics?.salesMonthPaise ?? 0)}
                         </span>
                       </div>
                       <div className="p-2.5 bg-emerald-50 rounded-xl flex items-center justify-between border border-emerald-100">
                         <span className="text-emerald-800 font-medium">Cumulative Gross Profit</span>
-                        <span className="font-bold text-emerald-900 font-mono">
+                        <span className="font-bold text-emerald-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {formatPaise(salesMetrics?.totalProfitPaise ?? 0)}
                         </span>
                       </div>
                       <div className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between">
                         <span className="text-slate-600">Completed Orders</span>
-                        <span className="font-bold text-slate-900 font-mono">
+                        <span className="font-bold text-slate-900 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {salesMetrics?.totalSalesCount ?? 0}
                         </span>
                       </div>
@@ -592,12 +598,12 @@ export default function Dashboard({
                       <h3 className="text-sm font-bold text-slate-900">Inventory by Category</h3>
                       <p className="text-xs text-slate-500">Unit stock distribution</p>
                     </div>
-                    <span className="text-xs font-mono text-slate-400">
+                    <span className="text-xs font-mono tabular-nums text-slate-400" style={{ fontVariantNumeric: 'tabular-nums' }}>
                       {dashboard?.categoryBreakdown?.length || 0} categories
                     </span>
                   </div>
 
-                  <div className="h-56 w-full pt-2">
+                  <div className="h-56 w-full pt-2 chart-enter-animate">
                     {dashboard?.categoryBreakdown?.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-xs text-slate-400 bg-slate-50 rounded-xl">
                         No categories found
@@ -615,7 +621,14 @@ export default function Dashboard({
                             formatter={(value) => [`${value} units`, 'Quantity']}
                             contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
                           />
-                          <Bar dataKey="totalQuantity" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                          <Bar
+                            dataKey="totalQuantity"
+                            fill="#0d9488"
+                            radius={[4, 4, 0, 0]}
+                            isAnimationActive={true}
+                            animationDuration={380}
+                            animationEasing="ease-out"
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -663,10 +676,10 @@ export default function Dashboard({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="font-bold text-indigo-700 font-mono">
+                            <span className="font-bold text-indigo-700 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                               {prod.unitsSoldLast30Days} sold
                             </span>
-                            <p className="text-[10px] text-slate-400">{prod.averageDailySalesLast30Days} / day</p>
+                            <p className="text-[10px] text-slate-400 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.averageDailySalesLast30Days} / day</p>
                           </div>
                         </div>
                       ))
@@ -720,7 +733,7 @@ export default function Dashboard({
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500 truncate">Vendor: {po.supplierName}</p>
-                              <p className="text-[10px] text-slate-400">
+                              <p className="text-[10px] text-slate-400 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                                 {po.totalQuantityReceived}/{po.totalQuantityOrdered} units | {formatPaise(po.totalAmountPaise)}
                               </p>
                             </div>
@@ -768,10 +781,10 @@ export default function Dashboard({
                             <div className="min-w-0 flex-1">
                               <p className="font-bold text-slate-900 truncate">{prod.productName}</p>
                               <p className="text-[11px] text-slate-600">
-                                Stock: <span className="font-bold text-rose-700">{prod.currentQuantity}</span> / Alert: {prod.lowStockLevel}
+                                Stock: <span className="font-bold text-rose-700 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.currentQuantity}</span> / Alert: <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.lowStockLevel}</span>
                               </p>
                               <p className="text-[10px] text-slate-400">
-                                Preferred Target: {prod.preferredStockLevel || 'Not set'}
+                                Preferred Target: <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.preferredStockLevel || 'Not set'}</span>
                               </p>
                             </div>
                             <button
@@ -779,7 +792,7 @@ export default function Dashboard({
                               className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[11px] font-bold shrink-0 transition flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
-                              <span>Order {prod.recommendedRestockQuantity || 10}</span>
+                              <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>Order {prod.recommendedRestockQuantity || 10}</span>
                             </button>
                           </div>
                         ))
@@ -796,7 +809,10 @@ export default function Dashboard({
                     <p className="text-xs text-slate-500">Live transaction history</p>
                   </div>
                   <button
-                    onClick={() => setActiveTab('stock-control')}
+                    onClick={() => {
+                      setStockControlSubTab('movements');
+                      setActiveTab('stock-control');
+                    }}
                     className="text-xs font-semibold text-teal-600 hover:text-teal-700"
                   >
                     Full Ledger &rarr;
@@ -842,17 +858,18 @@ export default function Dashboard({
 
                         <div className="text-right shrink-0">
                           <span
-                            className={`font-mono font-bold ${
+                            className={`font-mono font-bold tabular-nums ${
                               m.movementType === 'IN'
                                 ? 'text-emerald-700'
                                 : m.movementType === 'OUT'
                                 ? 'text-rose-700'
                                 : 'text-amber-700'
                             }`}
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
                           >
                             {m.movementType === 'IN' ? `+${m.quantity}` : m.movementType === 'OUT' ? `-${m.quantity}` : `=${m.newQuantity}`}
                           </span>
-                          <p className="text-[10px] text-slate-400">{formatDateTime(m.createdAt)}</p>
+                          <p className="text-[10px] text-slate-400 tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatDateTime(m.createdAt)}</p>
                         </div>
                       </div>
                     ))

@@ -99,6 +99,7 @@ export default function PoModal({
                         onChange={(e) => handlePoItemChange(idx, 'productId', e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
                       >
+                        <option value="">Select a product...</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} ({p.sku})
