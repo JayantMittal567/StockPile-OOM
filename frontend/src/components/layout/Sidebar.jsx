@@ -73,7 +73,7 @@ export default function Sidebar({
             {/* Dock/Collapse Toggle Button */}
             {setSidebarCollapsed && (
               <button
-                onClick={() => setSidebarCollapsed(true)}
+                onClick={() => setSidebarCollapsed((prev) => !prev)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
                 title="Collapse sidebar"
                 aria-label="Collapse sidebar"

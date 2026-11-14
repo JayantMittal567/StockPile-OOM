@@ -98,14 +98,14 @@ export default function Header({
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Desktop sidebar dock toggle when collapsed */}
-        {sidebarCollapsed && setSidebarCollapsed && (
+        {/* Desktop sidebar dock/collapse toggle */}
+        {setSidebarCollapsed && (
           <button
-            onClick={() => setSidebarCollapsed(false)}
+            onClick={() => setSidebarCollapsed((prev) => !prev)}
             className="hidden lg:inline-flex p-2 rounded-xl transition hover:bg-slate-100 dark:hover:bg-slate-800"
             style={{ color: 'var(--text-secondary)' }}
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -124,7 +124,7 @@ export default function Header({
         <button
           ref={themeToggleRef}
           onClick={toggleDarkMode}
-          className="w-9 h-9 inline-flex items-center justify-center shrink-0 rounded-xl transition-all duration-200 hover:scale-105"
+          className="w-9 h-9 inline-flex items-center justify-center shrink-0 rounded-xl transition-colors duration-200"
           style={{
             color: 'var(--text-secondary)',
             backgroundColor: 'var(--accent-subtle)'
@@ -132,11 +132,13 @@ export default function Header({
           title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-          {darkMode ? (
-            <Sun className="w-4 h-4 shrink-0 block" />
-          ) : (
-            <Moon className="w-4 h-4 shrink-0 block" />
-          )}
+          <span className="w-4 h-4 inline-flex items-center justify-center shrink-0">
+            {darkMode ? (
+              <Sun className="w-4 h-4 shrink-0 block" />
+            ) : (
+              <Moon className="w-4 h-4 shrink-0 block" />
+            )}
+          </span>
         </button>
 
         {/* Quick POS Trigger */}

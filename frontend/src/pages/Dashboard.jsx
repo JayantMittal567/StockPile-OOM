@@ -733,7 +733,7 @@ export default function Dashboard({
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500 truncate">Vendor: {po.supplierName}</p>
-                              <p className="text-[10px] text-slate-400">
+                              <p className="text-[10px] text-slate-400 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>
                                 {po.totalQuantityReceived}/{po.totalQuantityOrdered} units | {formatPaise(po.totalAmountPaise)}
                               </p>
                             </div>
@@ -781,10 +781,10 @@ export default function Dashboard({
                             <div className="min-w-0 flex-1">
                               <p className="font-bold text-slate-900 truncate">{prod.productName}</p>
                               <p className="text-[11px] text-slate-600">
-                                Stock: <span className="font-bold text-rose-700">{prod.currentQuantity}</span> / Alert: {prod.lowStockLevel}
+                                Stock: <span className="font-bold text-rose-700 font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.currentQuantity}</span> / Alert: <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.lowStockLevel}</span>
                               </p>
                               <p className="text-[10px] text-slate-400">
-                                Preferred Target: {prod.preferredStockLevel || 'Not set'}
+                                Preferred Target: <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>{prod.preferredStockLevel || 'Not set'}</span>
                               </p>
                             </div>
                             <button
@@ -792,7 +792,7 @@ export default function Dashboard({
                               className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[11px] font-bold shrink-0 transition flex items-center gap-1"
                             >
                               <Plus className="w-3 h-3" />
-                              <span>Order {prod.recommendedRestockQuantity || 10}</span>
+                              <span className="font-mono tabular-nums" style={{ fontVariantNumeric: 'tabular-nums' }}>Order {prod.recommendedRestockQuantity || 10}</span>
                             </button>
                           </div>
                         ))
