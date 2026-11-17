@@ -90,10 +90,10 @@ function StockPileWorkspace() {
     }
   }, [activeTab]);
 
-  // Auth Protection Gate
-  if (!isAuthenticated) {
-    return <AuthPage />;
-  }
+  // Auth Protection Gate (Bypassed - uncomment to re-enable)
+  // if (!isAuthenticated) {
+  //   return <AuthPage />;
+  // }
 
   return (
     <div

@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export const DEMO_USER = {
-  id: 'usr_demo_01',
-  name: 'Alex Morgan',
-  email: 'alex.morgan@stockpile.io',
+  id: 'demo-1',
+  name: 'Admin',
+  email: 'admin@stockpile.local',
   role: 'Inventory Director',
   provider: 'local'
 };
@@ -17,14 +17,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-      // Auto-initialize with Demo User if first time or not explicitly logged out
-      const loggedOut = localStorage.getItem('stockpile_logged_out') === 'true';
-      if (!loggedOut) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_USER));
-        return DEMO_USER;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          if (parsed.name === 'Alex Morgan') {
+            parsed.name = 'Admin';
+          }
+          return parsed;
+        }
       }
-      return null;
+      return DEMO_USER;
     } catch {
       return DEMO_USER;
     }
@@ -190,9 +192,11 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const activeUser = user || DEMO_USER;
+
   const value = {
-    user,
-    isAuthenticated: Boolean(user),
+    user: activeUser,
+    isAuthenticated: Boolean(activeUser),
     loading,
     login,
     signup,

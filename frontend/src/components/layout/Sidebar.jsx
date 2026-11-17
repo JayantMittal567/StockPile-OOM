@@ -11,8 +11,7 @@ import {
   Database,
   RefreshCw,
   X,
-  ChevronLeft,
-  LogOut
+  ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -45,7 +44,7 @@ export default function Sidebar({
   sidebarCollapsed = false,
   setSidebarCollapsed
 }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   return (
     <>
       {/* ================= DESKTOP SIDEBAR (>= 1024px) ================= */}
@@ -211,23 +210,8 @@ export default function Sidebar({
                 </div>
                 {/* User Tooltip */}
                 <div className="fixed left-[76px] px-2.5 py-1.5 bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 text-xs font-semibold rounded-lg shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 whitespace-nowrap">
-                  <p className="font-bold">{user?.name || 'Alex Morgan'}</p>
+                  <p className="font-bold">{user?.name || 'Admin'}</p>
                   <p className="text-[10px] opacity-80">{user?.role || 'Inventory Director'}</p>
-                </div>
-              </div>
-
-              {/* Compact Logout Icon Button */}
-              <div className="relative group flex items-center justify-center">
-                <button
-                  onClick={logout}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-stone-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                  title="Sign Out"
-                  aria-label="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-                <div className="fixed left-[76px] px-2.5 py-1.5 bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 text-xs font-semibold rounded-lg shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 whitespace-nowrap">
-                  Sign Out
                 </div>
               </div>
             </div>
@@ -242,7 +226,7 @@ export default function Sidebar({
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-900 dark:text-stone-100 truncate">
-                    {user?.name || 'Alex Morgan'}
+                    {user?.name || 'Admin'}
                   </p>
                   <p className="text-[10px] text-slate-500 dark:text-stone-400 truncate flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
@@ -250,15 +234,6 @@ export default function Sidebar({
                   </p>
                 </div>
               </div>
-
-              <button
-                onClick={logout}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition shrink-0 cursor-pointer"
-                title="Sign Out"
-                aria-label="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
 
             {/* SQLite Database Status */}
@@ -388,7 +363,7 @@ export default function Sidebar({
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-slate-900 dark:text-stone-100 truncate">
-                      {user?.name || 'Alex Morgan'}
+                      {user?.name || 'Admin'}
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-stone-400 truncate flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
@@ -396,18 +371,6 @@ export default function Sidebar({
                     </p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => {
-                    logout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition shrink-0 cursor-pointer"
-                  title="Sign Out"
-                  aria-label="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
               </div>
 
               <div className="p-3 bg-white/90 dark:bg-stone-900/80 rounded-xl border border-stone-300/80 dark:border-stone-800 text-[11px] text-slate-700 dark:text-stone-300 shadow-xs">
