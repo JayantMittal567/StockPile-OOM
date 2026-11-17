@@ -83,7 +83,7 @@ export default function QuickActionModal({
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min={quickActionForm.action === 'ADJUST' ? 0 : 1}
                   required
                   value={quickActionForm.quantity}
                   onChange={(e) => setQuickActionForm({ ...quickActionForm, quantity: e.target.value })}

@@ -290,6 +290,7 @@ function StockPileWorkspace() {
                   quickActionForm={modalProps.quickActionForm}
                   setQuickActionForm={modalProps.setQuickActionForm}
                   submittingQuickAction={modalProps.submittingQuickAction}
+                  quickActionError={modalProps.quickActionError}
                   handleQuickActionSubmit={handlers.handleQuickActionSubmit}
                   loadingSelectedAudit={data.loadingSelectedAudit}
                   auditItemSearch={data.auditItemSearch}

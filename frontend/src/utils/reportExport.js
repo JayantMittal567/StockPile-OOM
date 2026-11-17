@@ -143,7 +143,7 @@ export function exportReportToCSV({
         exp.category || '',
         exp.description || '',
         ((exp.amountPaise || 0) / 100).toFixed(2),
-        exp.expenseDate || '',
+        (exp.createdAt || '').slice(0, 10),
         formatDateTime(exp.createdAt)
       ]);
     });

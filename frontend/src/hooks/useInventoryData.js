@@ -314,7 +314,7 @@ export function useInventoryData({
       setSurplusSuggestions(suggestionsRes || []);
       setSurplusListings(listingsRes || []);
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to load surplus data.';
+      const msg = err.response?.data?.error || err.message || 'Failed to load surplus data.';
       setSurplusError(msg);
       triggerAlert('error', msg);
     } finally {

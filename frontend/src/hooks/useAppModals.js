@@ -4,6 +4,8 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  assignProductSupplier,
+  removeProductSupplier,
   stockIn,
   adjustStock,
   getSaleById,
@@ -424,9 +426,17 @@ export function useAppModals({
           minStockLevel: parseInt(productForm.minStockLevel, 10) || 0,
           targetStockLevel: parseInt(productForm.targetStockLevel, 10) || 0,
           averageDailySales: editingProduct.averageDailySales ?? 0.0,
-          leadTimeDays: editingProduct.leadTimeDays ?? 0,
-          supplierId: productForm.supplierId ? parseInt(productForm.supplierId, 10) : null
+          leadTimeDays: editingProduct.leadTimeDays ?? 0
         });
+        const desiredSupplierId = productForm.supplierId ? parseInt(productForm.supplierId, 10) : null;
+        const currentSupplierId = editingProduct.supplierId ?? null;
+        if (desiredSupplierId !== currentSupplierId) {
+          if (desiredSupplierId) {
+            await assignProductSupplier(editingProduct.id, desiredSupplierId);
+          } else {
+            await removeProductSupplier(editingProduct.id);
+          }
+        }
         triggerAlert('success', `Product "${productForm.name}" updated successfully.`);
       } else {
         await createProduct({
@@ -508,9 +518,10 @@ export function useAppModals({
     setQuickActionModalOpen(true);
   };
 
-  const handleQuickActionSubmit = async (e) => {
+  const handleQuickActionSubmit = async (e, actionOverride = null) => {
     e.preventDefault();
     setQuickActionError('');
+    const action = actionOverride || quickActionForm.action;
     const pId = parseInt(quickActionForm.productId, 10);
     const qty = parseInt(quickActionForm.quantity, 10);
 
@@ -518,17 +529,19 @@ export function useAppModals({
       setQuickActionError('Please select a product.');
       return;
     }
-    if (isNaN(qty) || qty <= 0) {
-      setQuickActionError('Quantity must be greater than zero.');
+    if (isNaN(qty) || qty < 0 || (action !== 'ADJUST' && qty === 0)) {
+      setQuickActionError(
+        action === 'ADJUST' ? 'Quantity must be zero or greater.' : 'Quantity must be greater than zero.'
+      );
       return;
     }
 
     setSubmittingQuickAction(true);
     try {
-      if (quickActionForm.action === 'RECEIVE') {
+      if (action === 'RECEIVE') {
         await stockIn(pId, qty, quickActionForm.reason);
         triggerAlert('success', `Stock received successfully (+${qty} units).`);
-      } else if (quickActionForm.action === 'SALE') {
+      } else if (action === 'SALE') {
         await createSale({
           items: [{ productId: pId, quantity: qty }],
           discountPaise: 0,
@@ -1501,10 +1514,7 @@ export function useAppModals({
     } catch (err) {
       console.error('Failed to create surplus listing:', err);
       setCreateSurplusError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          err.message ||
-          'Failed to create surplus listing.'
+        err.response?.data?.error || err.message || 'Failed to create surplus listing.'
       );
     } finally {
       setSubmittingCreateSurplus(false);
@@ -1558,7 +1568,7 @@ export function useAppModals({
       await fetchDashboardData();
     } catch (err) {
       console.error('Failed to record surplus sale:', err);
-      setSurplusSaleError(err.response?.data?.message || err.message || 'Failed to record surplus sale.');
+      setSurplusSaleError(err.response?.data?.error || err.message || 'Failed to record surplus sale.');
     } finally {
       setSubmittingSurplusSale(false);
     }
@@ -1586,7 +1596,7 @@ export function useAppModals({
       await fetchProductsData('', '');
     } catch (err) {
       console.error('Failed to cancel surplus listing:', err);
-      triggerAlert('error', err.response?.data?.message || err.message || 'Failed to cancel listing.');
+      triggerAlert('error', err.response?.data?.error || err.message || 'Failed to cancel listing.');
     } finally {
       setSubmittingCancelSurplus(false);
     }
@@ -1601,7 +1611,7 @@ export function useAppModals({
       setSelectedSurplusDetail(detail);
     } catch (err) {
       console.error('Failed to load surplus listing detail:', err);
-      triggerAlert('error', 'Failed to load listing details: ' + (err.response?.data?.message || err.message));
+      triggerAlert('error', 'Failed to load listing details: ' + (err.response?.data?.error || err.message));
     } finally {
       setLoadingSurplusDetail(false);
     }
@@ -1677,6 +1687,7 @@ export function useAppModals({
       setQuickActionForm,
       submittingQuickAction,
       quickActionError,
+      handleQuickActionSubmit,
       // Sales
       saleModalOpen,
       setSaleModalOpen,

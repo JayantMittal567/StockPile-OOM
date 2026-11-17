@@ -81,6 +81,7 @@ export default function StockControl({
   quickActionForm = {},
   setQuickActionForm = () => {},
   submittingQuickAction = false,
+  quickActionError = '',
   handleQuickActionSubmit = () => {}
 }) {
   return (
@@ -101,7 +102,14 @@ export default function StockControl({
                   </button>
 
                   <button
-                    onClick={() => setStockControlSubTab('adjustments')}
+                    onClick={() => {
+                      setStockControlSubTab('adjustments');
+                      setQuickActionForm({
+                        ...quickActionForm,
+                        action: 'ADJUST',
+                        reason: 'Physical count reconciliation'
+                      });
+                    }}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                       stockControlSubTab === 'adjustments'
                         ? 'bg-[#EA580C] text-white shadow-xs'
@@ -345,7 +353,13 @@ export default function StockControl({
                     <p className="text-xs text-slate-500">Reconcile physical inventory counts against system records</p>
                   </div>
 
-                  <form onSubmit={handleQuickActionSubmit} className="space-y-4">
+                  <form onSubmit={(e) => handleQuickActionSubmit(e, 'ADJUST')} className="space-y-4">
+                    {quickActionError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{quickActionError}</span>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-bold text-slate-800 mb-1">Select Product</label>
                       <select

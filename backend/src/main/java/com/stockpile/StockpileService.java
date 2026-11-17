@@ -3133,7 +3133,11 @@ public class StockpileService {
                 COUNT(DISTINCT s.id) AS sales_count,
                 COALESCE(SUM(si.quantity), 0) AS units_sold
             FROM sales s
-            LEFT JOIN sale_items si ON s.id = si.sale_id
+            LEFT JOIN (
+                SELECT sale_id, SUM(quantity) AS quantity
+                FROM sale_items
+                GROUP BY sale_id
+            ) si ON s.id = si.sale_id
             WHERE s.status = 'COMPLETED'
               AND datetime(replace(s.created_at, 'T', ' ')) >= ?
               AND datetime(replace(s.created_at, 'T', ' ')) < ?

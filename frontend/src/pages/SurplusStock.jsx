@@ -381,7 +381,7 @@ export default function SurplusStock({
                         { id: '', label: 'All Listings' },
                         { id: 'ACTIVE', label: 'Active' },
                         { id: 'PARTIALLY_SOLD', label: 'Partially Sold' },
-                        { id: 'SOLD_OUT', label: 'Sold Out' },
+                        { id: 'SOLD', label: 'Sold Out' },
                         { id: 'CANCELLED', label: 'Cancelled' }
                       ].map((tab) => (
                         <button
@@ -460,11 +460,11 @@ export default function SurplusStock({
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                         : l.status === 'PARTIALLY_SOLD'
                                         ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                        : l.status === 'SOLD_OUT'
+                                        : l.status === 'SOLD'
                                         ? 'bg-purple-50 text-purple-700 border-purple-200'
                                         : 'bg-slate-100 text-slate-600 border-slate-200'
                                     }`}>
-                                      {l.status?.replace(/_/g, ' ')}
+                                      {l.status === 'SOLD' ? 'SOLD OUT' : l.status?.replace(/_/g, ' ')}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-center">

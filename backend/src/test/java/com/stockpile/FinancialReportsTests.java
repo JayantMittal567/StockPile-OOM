@@ -222,6 +222,42 @@ public class FinancialReportsTests {
         assertEquals(3, pnl.breakdown().get(29).unitsSold());
     }
 
+    @Test
+    @DisplayName("3b. Multi-item sales do not inflate daily breakdown revenue, profit or counts")
+    void testMultiItemSaleBreakdownNotInflatedByItemJoin() {
+        StockpileService.Product a = createTestProduct("Adapter", "ADP-01", "Electronics", 1000L, 5000L, 100);
+        StockpileService.Product b = createTestProduct("Bracket", "BRK-01", "Hardware", 2000L, 8000L, 100);
+
+        StockpileService.SaleDetails multi = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(
+                new StockpileService.SaleItemRequest(a.id(), 2),
+                new StockpileService.SaleItemRequest(b.id(), 3)
+            ), 1000L, "CASH"
+        ));
+        jdbcTemplate.update("UPDATE sales SET created_at = '2026-04-10 06:00:00' WHERE id = ?", multi.id());
+
+        StockpileService.SaleDetails single = service.createSale(new StockpileService.CreateSaleRequest(
+            List.of(new StockpileService.SaleItemRequest(a.id(), 1)), 0L, "UPI"
+        ));
+        jdbcTemplate.update("UPDATE sales SET created_at = '2026-04-10 08:00:00' WHERE id = ?", single.id());
+
+        StockpileService.FinancialSummaryReport report = service.getFinancialSummaryReport("MONTHLY", null, null, null, 4, 2026);
+        StockpileService.FinancialMetricBreakdown day = report.breakdown().get(9);
+        assertEquals("2026-04-10", day.period());
+
+        assertEquals(multi.subtotalPaise() + single.subtotalPaise(), day.grossSalesPaise());
+        assertEquals(multi.discountPaise() + single.discountPaise(), day.discountsPaise());
+        assertEquals(multi.totalPaise() + single.totalPaise(), day.netRevenuePaise());
+        assertEquals(multi.totalCostPaise() + single.totalCostPaise(), day.cogsPaise());
+        assertEquals(multi.grossProfitPaise() + single.grossProfitPaise(), day.grossProfitPaise());
+        assertEquals(2, day.salesCount());
+        assertEquals(6, day.unitsSold());
+
+        assertEquals(day.netRevenuePaise(), report.netRevenuePaise());
+        assertEquals(day.grossProfitPaise(), report.grossProfitPaise());
+        assertEquals(day.unitsSold(), report.unitsSold());
+    }
+
     // ==========================================
     // 4. YEARLY REPORT TESTS
     // ==========================================
