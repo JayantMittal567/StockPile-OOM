@@ -68,6 +68,7 @@ export default function QuickActionModal({
                   onChange={(e) => setQuickActionForm({ ...quickActionForm, productId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                 >
+                  <option value="">-- Choose a Product --</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} (Current: {p.quantity} units)
@@ -82,7 +83,7 @@ export default function QuickActionModal({
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min={quickActionForm.action === 'ADJUST' ? 0 : 1}
                   required
                   value={quickActionForm.quantity}
                   onChange={(e) => setQuickActionForm({ ...quickActionForm, quantity: e.target.value })}

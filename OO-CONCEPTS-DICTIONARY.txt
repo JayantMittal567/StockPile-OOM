@@ -1,0 +1,118 @@
+STOCKPILE BACKEND — OO CONCEPTS DICTIONARY
+Generated: 2026-11-18 | Refactor: StockpileService god-class split into domain modules
+Total Hinglish concept comments: 27 (cap was 50)
+Marker used in code: "// OO: <Concept> — <Hinglish phrase>"
+Paths are relative to repository root. Line numbers verified by grep at generation time.
+
+CLASS, OBJECT, ATTRIBUTES, METHODS, CONSTRUCTORS ( basics )
+  backend/src/main/java/com/stockpile/model/CreateSurplusListingRequest.java:10  [Constructor] object bante hi state initialize hoti hai; chhota constructor optional fields ki default value bhar deta hai.
+  backend/src/main/java/com/stockpile/model/Product.java:3  [Class, Object & Attributes] Product ek class hai; har DB row iska object; record components uske attributes (state) hain.
+  backend/src/main/java/com/stockpile/model/SurplusListingDetails.java:57  [Methods] object ka behaviour; attributes se derive karke result deta hai, caller ko calculation nahi karni padti.
+  backend/src/main/java/com/stockpile/StockpileService.java:30  [Constructor Injection] dependencies bahar se milti hain (Spring deta hai), class khud object nahi banati; loose coupling banti hai.
+
+ENCAPSULATION
+  backend/src/main/java/com/stockpile/model/Product.java:5  [Encapsulation] components private final hain; bahar wale sirf accessor methods se value padh sakte hain, direct chhed-chhad nahi.
+
+ABSTRACTION
+  backend/src/main/java/com/stockpile/service/ReportService.java:583  [Abstraction] bhaari SQL aggregation ek method ke peeche chhupi; caller ko sirf ready report milti hai, complexity nahi.
+  backend/src/main/java/com/stockpile/service/SupplierService.java:34  [Abstraction] SQL queries aur validation andar chhupi hain; bahar sirf clean business methods dikhte hain.
+
+INHERITANCE
+  backend/src/main/java/com/stockpile/exception/ProductNotFoundException.java:4  [Inheritance] RuntimeException se derive (is-a); parent type ke catch/handler is child ko bhi pakad lete hain.
+
+POLYMORPHISM
+  backend/src/main/java/com/stockpile/model/UpdateSurplusListingRequest.java:9  [Polymorphism (compile-time overloading)] same constructor naam, alag parameter list; call site pe compiler decide karta hai kaunsa version chalega.
+  backend/src/main/java/com/stockpile/StockpileController.java:512  [Polymorphism (runtime)] parameter parent RuntimeException type ka, andar alag-alag child exception objects aate hain; ek hi handler sabko serve karta hai.
+
+ASSOCIATION
+  backend/src/main/java/com/stockpile/model/SaleItemDetails.java:3  [Association] item product ko reference karta hai (uses-a); product sale ke bina bhi independently exist karta hai.
+  backend/src/main/java/com/stockpile/service/InventoryService.java:197  [Association] products aur surplus_listings alag entities hain, product_id foreign key se jude (uses-a); reservation ka hisaab yahan milta hai.
+  backend/src/main/java/com/stockpile/service/ProductService.java:323  [Association (many-to-many)] product_suppliers link table products aur suppliers ko jodti hai; dono sides independent exist karti hain.
+
+AGGREGATION
+  backend/src/main/java/com/stockpile/model/DashboardResponse.java:5  [Aggregation] response breakdowns ko collect karta hai (has-a); ye parts alag se bhi ban sakte hain, weak ownership.
+
+COMPOSITION
+  backend/src/main/java/com/stockpile/model/SaleDetails.java:5  [Composition] SaleItemDetails sale ka apna hissa hai; sale khatam to items bhi khatam (strong owns-a, shared lifecycle).
+
+SOLID — Single Responsibility (SRP)
+  backend/src/main/java/com/stockpile/service/ProductService.java:34  [Single Responsibility (SRP)] ye module sirf product catalog aur supplier-link ka kaam karta hai; sales/stock ka bojh nahi.
+
+SOLID — Open/Closed (OCP)
+  backend/src/main/java/com/stockpile/model/CreateSaleRequest.java:12  [Open/Closed Principle (OCP)] naye convenience constructors se extension kiya, purane callers ka code chhede bina; existing behaviour band, extension khula.
+
+SOLID — Liskov Substitution (LSP)
+  backend/src/main/java/com/stockpile/exception/StockAuditConflictException.java:3  [Liskov Substitution (LSP)] IllegalStateException ki jagah ye child bina contract tode use ho sakta hai; parent ke rules ye bhi nibhata hai.
+
+SOLID — Interface Segregation (ISP)
+  backend/src/main/java/com/stockpile/service/ExpenseService.java:34  [Interface Segregation (ISP)] chhota focused API; client ko sirf expenses ke methods milte hain, poora god-service nahi.
+
+SOLID — Dependency Inversion (DIP)
+  backend/src/main/java/com/stockpile/service/InventoryService.java:40  [Dependency Inversion (DIP)] concrete DB driver par nahi, JdbcTemplate abstraction par depend; driver badle to service nahi badalti.
+
+DESIGN PATTERN — Facade
+  backend/src/main/java/com/stockpile/StockpileService.java:13  [Facade Pattern] ek hi simple entry point; andar ke 11 domain modules ka complex kaam chhupa hua hai.
+
+DESIGN PATTERN — Singleton (Spring bean)
+  backend/src/main/java/com/stockpile/service/DashboardService.java:34  [Singleton Pattern (Spring bean)] container is class ka ek hi instance banata hai; sab clients wahi instance share karte hain.
+
+DESIGN PATTERN — Template Method (RowMapper callback)
+  backend/src/main/java/com/stockpile/service/support/RowMappers.java:11  [Template Method] JdbcTemplate ka row-loop fixed algorithm hai; har row ko object mein badalna humara callback decide karta hai (hook).
+
+DESIGN PATTERN — DAO / Repository
+  backend/src/main/java/com/stockpile/service/support/RowMappers.java:6  [DAO/Repository Pattern] row-to-object mapping ek jagah centralized; services SQL result ko domain objects ki tarah use karti hain.
+
+EXCEPTION HANDLING
+  backend/src/main/java/com/stockpile/StockpileController.java:529  [Exception Handling] business layer throw karti hai, boundary (controller) catch karke meaningful HTTP status + JSON error banata hai.
+
+MODULARITY & MAINTAINABLE DESIGN
+  backend/src/main/java/com/stockpile/service/support/QuerySupport.java:6  [Modularity & Maintainable Design] shared helpers ek hi jagah; duplication nahi, ek fix sab jagah lagta hai.
+  backend/src/main/java/com/stockpile/StockpileService.java:150  [Modularity] pehle ka god-class ab patla facade hai; har call apne domain module ko delegate hoti hai, system chhote samajhne-layak tukdon mein bata hua.
+
+UML (class diagram, mermaid syntax — paste into any mermaid renderer)
+```mermaid
+classDiagram
+  StockpileService ..> ProductService : facade delegates
+  StockpileService ..> SupplierService
+  StockpileService ..> InventoryService
+  StockpileService ..> DashboardService
+  StockpileService ..> IntelligenceService
+  StockpileService ..> SalesService
+  StockpileService ..> PurchaseOrderService
+  StockpileService ..> StockAuditService
+  StockpileService ..> ReportService
+  StockpileService ..> ExpenseService
+  StockpileService ..> SurplusService
+  ProductService --> SupplierService : validates supplier
+  InventoryService --> ProductService
+  SalesService --> ProductService
+  SalesService --> InventoryService : reserved qty
+  IntelligenceService --> ProductService
+  PurchaseOrderService --> ProductService
+  PurchaseOrderService --> SupplierService
+  StockAuditService --> ProductService
+  StockAuditService --> InventoryService
+  SurplusService --> ProductService
+  SurplusService --> InventoryService
+  SurplusService --> SalesService
+  SurplusService --> IntelligenceService
+  ProductService ..> RowMappers : uses
+  SalesService ..> QuerySupport : uses
+  SaleDetails *-- SaleItemDetails : composition
+  SaleItemDetails --> Product : association
+  DashboardResponse o-- CategoryBreakdown : aggregation
+  DashboardResponse o-- PeriodActivity : aggregation
+  ProductNotFoundException --|> RuntimeException : inheritance
+  StockAuditConflictException --|> IllegalStateException : inheritance/LSP
+  SurplusListingDetails --> SurplusSaleTransaction : aggregation
+```
+
+MODULE MAP (after refactor)
+  com.stockpile.StockpileService      — thin Facade + schema init + health (412 lines, was 5537)
+  com.stockpile.StockpileController   — REST layer, unchanged contract
+  com.stockpile.model                 — 68 public records (DTOs), component order = JSON order
+  com.stockpile.exception             — 12 domain exceptions (404/409 mapping unchanged)
+  com.stockpile.service               — 11 domain services (Product, Supplier, Inventory,
+                                        Dashboard, Intelligence, Sales, PurchaseOrder,
+                                        StockAudit, Report, Expense, Surplus)
+  com.stockpile.service.support       — RowMappers (DAO mapping), QuerySupport (shared helpers)

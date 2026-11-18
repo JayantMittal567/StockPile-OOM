@@ -1,5 +1,8 @@
 package com.stockpile;
 
+import com.stockpile.exception.*;
+import com.stockpile.model.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,14 +41,14 @@ public class SupplierManagementTests {
         jdbcTemplate.update("DELETE FROM products");
     }
 
-    private StockpileService.Product createTestProduct(String name, String sku, String category, long purchasePaise, long sellingPaise, int qty) {
-        return service.createProduct(new StockpileService.CreateProductRequest(
+    private Product createTestProduct(String name, String sku, String category, long purchasePaise, long sellingPaise, int qty) {
+        return service.createProduct(new CreateProductRequest(
             name, sku, category, purchasePaise, sellingPaise, qty, 5, 20, 1.0, 5
         ));
     }
 
-    private StockpileService.Supplier createTestSupplier(String name, String contact, String phone, String email, String address, String notes) {
-        return service.createSupplier(new StockpileService.CreateSupplierRequest(
+    private Supplier createTestSupplier(String name, String contact, String phone, String email, String address, String notes) {
+        return service.createSupplier(new CreateSupplierRequest(
             name, contact, phone, email, address, notes
         ));
     }
@@ -57,7 +60,7 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("1. Create supplier with all fields")
     void testCreateSupplierFull() {
-        StockpileService.Supplier s = createTestSupplier(
+        Supplier s = createTestSupplier(
             "ABC Distributors", "Rahul Sharma", "9876543210", "rahul@abc.com", "New Delhi", "Key electronics vendor"
         );
 
@@ -75,7 +78,7 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("2. Create supplier with only required name")
     void testCreateSupplierMinimal() {
-        StockpileService.Supplier s = createTestSupplier(
+        Supplier s = createTestSupplier(
             "Apex Wholesale", null, null, null, null, null
         );
 
@@ -94,7 +97,7 @@ public class SupplierManagementTests {
         createTestSupplier("Supplier One", null, null, null, null, null);
         createTestSupplier("Supplier Two", null, null, null, null, null);
 
-        List<StockpileService.Supplier> list = service.getSuppliers(null);
+        List<Supplier> list = service.getSuppliers(null);
         assertEquals(2, list.size());
     }
 
@@ -105,43 +108,43 @@ public class SupplierManagementTests {
         createTestSupplier("Zenith Parts", "Jane", "9123456780", "contact@zenith.in", "Bengaluru", null);
 
         // Search by name
-        List<StockpileService.Supplier> byName = service.getSuppliers("apex");
+        List<Supplier> byName = service.getSuppliers("apex");
         assertEquals(1, byName.size());
         assertEquals("Apex Tools", byName.get(0).name());
 
         // Search by phone
-        List<StockpileService.Supplier> byPhone = service.getSuppliers("12345");
+        List<Supplier> byPhone = service.getSuppliers("12345");
         assertEquals(1, byPhone.size());
         assertEquals("Zenith Parts", byPhone.get(0).name());
 
         // Search by email
-        List<StockpileService.Supplier> byEmail = service.getSuppliers("tools.com");
+        List<Supplier> byEmail = service.getSuppliers("tools.com");
         assertEquals(1, byEmail.size());
         assertEquals("Apex Tools", byEmail.get(0).name());
 
         // No match
-        List<StockpileService.Supplier> none = service.getSuppliers("nonexistent");
+        List<Supplier> none = service.getSuppliers("nonexistent");
         assertTrue(none.isEmpty());
     }
 
     @Test
     @DisplayName("5. Retrieve supplier by ID")
     void testGetSupplierById() {
-        StockpileService.Supplier created = createTestSupplier("Delta Global", null, null, null, null, null);
-        StockpileService.Supplier fetched = service.getSupplierById(created.id());
+        Supplier created = createTestSupplier("Delta Global", null, null, null, null, null);
+        Supplier fetched = service.getSupplierById(created.id());
 
         assertEquals(created.id(), fetched.id());
         assertEquals("Delta Global", fetched.name());
 
-        assertThrows(StockpileService.SupplierNotFoundException.class, () -> service.getSupplierById(99999L));
+        assertThrows(SupplierNotFoundException.class, () -> service.getSupplierById(99999L));
     }
 
     @Test
     @DisplayName("6. Update supplier details")
     void testUpdateSupplier() {
-        StockpileService.Supplier created = createTestSupplier("Old Name", "Old Contact", null, null, null, null);
+        Supplier created = createTestSupplier("Old Name", "Old Contact", null, null, null, null);
 
-        StockpileService.Supplier updated = service.updateSupplier(created.id(), new StockpileService.UpdateSupplierRequest(
+        Supplier updated = service.updateSupplier(created.id(), new UpdateSupplierRequest(
             "New Name", "New Contact", "9876543210", "new@example.com", "Updated Address", "Updated Notes"
         ));
 
@@ -152,8 +155,8 @@ public class SupplierManagementTests {
         assertEquals("Updated Address", updated.address());
         assertEquals("Updated Notes", updated.notes());
 
-        assertThrows(StockpileService.SupplierNotFoundException.class, () ->
-            service.updateSupplier(99999L, new StockpileService.UpdateSupplierRequest(
+        assertThrows(SupplierNotFoundException.class, () ->
+            service.updateSupplier(99999L, new UpdateSupplierRequest(
                 "Name", null, null, null, null, null
             ))
         );
@@ -230,15 +233,15 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("10. Assign preferred supplier to product")
     void testAssignSupplierToProduct() {
-        StockpileService.Product p = createTestProduct("Hammer", "HMR-01", "Tools", 50000L, 80000L, 10);
-        StockpileService.Supplier s = createTestSupplier("Tool Makers Ltd", null, null, null, null, null);
+        Product p = createTestProduct("Hammer", "HMR-01", "Tools", 50000L, 80000L, 10);
+        Supplier s = createTestSupplier("Tool Makers Ltd", null, null, null, null, null);
 
-        StockpileService.Product updated = service.assignSupplierToProduct(p.id(), s.id());
+        Product updated = service.assignSupplierToProduct(p.id(), s.id());
 
         assertEquals(s.id(), updated.supplierId());
         assertEquals("Tool Makers Ltd", updated.supplierName());
 
-        StockpileService.Product reloaded = service.getProductById(p.id());
+        Product reloaded = service.getProductById(p.id());
         assertEquals(s.id(), reloaded.supplierId());
         assertEquals("Tool Makers Ltd", reloaded.supplierName());
     }
@@ -246,16 +249,16 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("11. Replace preferred supplier for product")
     void testReplacePreferredSupplier() {
-        StockpileService.Product p = createTestProduct("Wrench", "WRN-01", "Tools", 30000L, 50000L, 10);
-        StockpileService.Supplier s1 = createTestSupplier("Supplier Alpha", null, null, null, null, null);
-        StockpileService.Supplier s2 = createTestSupplier("Supplier Beta", null, null, null, null, null);
+        Product p = createTestProduct("Wrench", "WRN-01", "Tools", 30000L, 50000L, 10);
+        Supplier s1 = createTestSupplier("Supplier Alpha", null, null, null, null, null);
+        Supplier s2 = createTestSupplier("Supplier Beta", null, null, null, null, null);
 
         service.assignSupplierToProduct(p.id(), s1.id());
-        StockpileService.Product afterFirst = service.getProductById(p.id());
+        Product afterFirst = service.getProductById(p.id());
         assertEquals(s1.id(), afterFirst.supplierId());
 
         service.assignSupplierToProduct(p.id(), s2.id());
-        StockpileService.Product afterSecond = service.getProductById(p.id());
+        Product afterSecond = service.getProductById(p.id());
         assertEquals(s2.id(), afterSecond.supplierId());
         assertEquals("Supplier Beta", afterSecond.supplierName());
     }
@@ -263,14 +266,14 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("12. Remove preferred supplier from product")
     void testRemoveSupplierFromProduct() {
-        StockpileService.Product p = createTestProduct("Pliers", "PLR-01", "Tools", 20000L, 35000L, 15);
-        StockpileService.Supplier s = createTestSupplier("Hardware Supply", null, null, null, null, null);
+        Product p = createTestProduct("Pliers", "PLR-01", "Tools", 20000L, 35000L, 15);
+        Supplier s = createTestSupplier("Hardware Supply", null, null, null, null, null);
 
         service.assignSupplierToProduct(p.id(), s.id());
         assertEquals(s.id(), service.getProductById(p.id()).supplierId());
 
         service.removeSupplierFromProduct(p.id());
-        StockpileService.Product afterRemoval = service.getProductById(p.id());
+        Product afterRemoval = service.getProductById(p.id());
         assertNull(afterRemoval.supplierId());
         assertNull(afterRemoval.supplierName());
         assertEquals(15, afterRemoval.quantity()); // Stock unchanged
@@ -279,18 +282,18 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("13. Get products associated with supplier")
     void testGetProductsAssociatedWithSupplier() {
-        StockpileService.Supplier s = createTestSupplier("Global Fasteners", null, null, null, null, null);
-        StockpileService.Product p1 = createTestProduct("Screw M4", "SCR-M4", "Fasteners", 100L, 200L, 500);
-        StockpileService.Product p2 = createTestProduct("Bolt M8", "BLT-M8", "Fasteners", 250L, 500L, 250);
-        StockpileService.Product p3 = createTestProduct("Unrelated Tool", "TOOL-99", "Tools", 1000L, 2000L, 5);
+        Supplier s = createTestSupplier("Global Fasteners", null, null, null, null, null);
+        Product p1 = createTestProduct("Screw M4", "SCR-M4", "Fasteners", 100L, 200L, 500);
+        Product p2 = createTestProduct("Bolt M8", "BLT-M8", "Fasteners", 250L, 500L, 250);
+        Product p3 = createTestProduct("Unrelated Tool", "TOOL-99", "Tools", 1000L, 2000L, 5);
 
         service.assignSupplierToProduct(p1.id(), s.id());
         service.assignSupplierToProduct(p2.id(), s.id());
 
-        List<StockpileService.SupplierProduct> supplierProducts = service.getProductsBySupplier(s.id());
+        List<SupplierProduct> supplierProducts = service.getProductsBySupplier(s.id());
         assertEquals(2, supplierProducts.size());
 
-        for (StockpileService.SupplierProduct sp : supplierProducts) {
+        for (SupplierProduct sp : supplierProducts) {
             assertNotNull(sp.productId());
             assertNotNull(sp.name());
             assertNotNull(sp.sku());
@@ -306,16 +309,16 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("14. Reject association with nonexistent supplier or product")
     void testRejectNonexistentAssociation() {
-        StockpileService.Product p = createTestProduct("Saw", "SAW-01", "Tools", 40000L, 70000L, 8);
-        StockpileService.Supplier s = createTestSupplier("Saw Works", null, null, null, null, null);
+        Product p = createTestProduct("Saw", "SAW-01", "Tools", 40000L, 70000L, 8);
+        Supplier s = createTestSupplier("Saw Works", null, null, null, null, null);
 
         // Nonexistent supplier
-        assertThrows(StockpileService.SupplierNotFoundException.class, () ->
+        assertThrows(SupplierNotFoundException.class, () ->
             service.assignSupplierToProduct(p.id(), 99999L)
         );
 
         // Nonexistent product
-        assertThrows(StockpileService.ProductNotFoundException.class, () ->
+        assertThrows(ProductNotFoundException.class, () ->
             service.assignSupplierToProduct(99999L, s.id())
         );
     }
@@ -327,12 +330,12 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("15. Prevent deletion when products are associated (HTTP 409 Conflict)")
     void testPreventDeletionWhenProductsAssociated() {
-        StockpileService.Product p = createTestProduct("Tape", "TP-01", "Tools", 5000L, 10000L, 20);
-        StockpileService.Supplier s = createTestSupplier("Tape Factory", null, null, null, null, null);
+        Product p = createTestProduct("Tape", "TP-01", "Tools", 5000L, 10000L, 20);
+        Supplier s = createTestSupplier("Tape Factory", null, null, null, null, null);
         service.assignSupplierToProduct(p.id(), s.id());
 
-        StockpileService.SupplierConflictException ex = assertThrows(
-            StockpileService.SupplierConflictException.class,
+        SupplierConflictException ex = assertThrows(
+            SupplierConflictException.class,
             () -> service.deleteSupplier(s.id())
         );
         assertTrue(ex.getMessage().contains("Cannot delete supplier"));
@@ -345,25 +348,25 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("16. Delete an unassociated supplier successfully")
     void testDeleteUnassociatedSupplier() {
-        StockpileService.Supplier s = createTestSupplier("Temp Supplier", null, null, null, null, null);
+        Supplier s = createTestSupplier("Temp Supplier", null, null, null, null, null);
         assertNotNull(service.getSupplierById(s.id()));
 
         service.deleteSupplier(s.id());
-        assertThrows(StockpileService.SupplierNotFoundException.class, () -> service.getSupplierById(s.id()));
+        assertThrows(SupplierNotFoundException.class, () -> service.getSupplierById(s.id()));
     }
 
     @Test
     @DisplayName("17. Verify products without suppliers work and return null supplierId/supplierName")
     void testProductsWithoutSuppliers() {
-        StockpileService.Product p = createTestProduct("Drill Bit", "DB-01", "Tools", 1500L, 3000L, 50);
+        Product p = createTestProduct("Drill Bit", "DB-01", "Tools", 1500L, 3000L, 50);
 
-        StockpileService.Product fetched = service.getProductById(p.id());
+        Product fetched = service.getProductById(p.id());
         assertNull(fetched.supplierId());
         assertNull(fetched.supplierName());
 
-        List<StockpileService.Product> all = service.getProducts(null, null);
+        List<Product> all = service.getProducts(null, null);
         assertFalse(all.isEmpty());
-        StockpileService.Product inList = all.stream().filter(prod -> prod.id().equals(p.id())).findFirst().orElseThrow();
+        Product inList = all.stream().filter(prod -> prod.id().equals(p.id())).findFirst().orElseThrow();
         assertNull(inList.supplierId());
         assertNull(inList.supplierName());
     }
@@ -375,21 +378,21 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("18. Verify existing Product CRUD and Inventory Operations unaffected")
     void testProductCrudAndInventoryUnaffected() {
-        StockpileService.Product p = createTestProduct("Chisel", "CH-01", "Tools", 8000L, 15000L, 10);
+        Product p = createTestProduct("Chisel", "CH-01", "Tools", 8000L, 15000L, 10);
 
         // Update product
-        service.updateProduct(p.id(), new StockpileService.UpdateProductRequest(
+        service.updateProduct(p.id(), new UpdateProductRequest(
             "Wood Chisel", p.sku(), p.category(), 9000L, 16000L,
             p.minStockLevel(), p.targetStockLevel(), p.averageDailySales(), p.leadTimeDays()
         ));
         assertEquals("Wood Chisel", service.getProductById(p.id()).name());
 
         // Stock In
-        service.recordMovement(new StockpileService.CreateMovementRequest(p.id(), "IN", 5, "Restock"));
+        service.recordMovement(new CreateMovementRequest(p.id(), "IN", 5, "Restock"));
         assertEquals(15, service.getProductById(p.id()).quantity());
 
         // Stock Out
-        service.recordMovement(new StockpileService.CreateMovementRequest(p.id(), "OUT", 3, "Sale"));
+        service.recordMovement(new CreateMovementRequest(p.id(), "OUT", 3, "Sale"));
         assertEquals(12, service.getProductById(p.id()).quantity());
 
         // Dashboard & Intelligence
@@ -400,13 +403,13 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("19. Verify Sales Management functionality unaffected")
     void testSalesManagementUnaffected() {
-        StockpileService.Product p = createTestProduct("Screwdriver", "SD-01", "Tools", 5000L, 10000L, 20);
-        StockpileService.Supplier s = createTestSupplier("Tool Corp", null, null, null, null, null);
+        Product p = createTestProduct("Screwdriver", "SD-01", "Tools", 5000L, 10000L, 20);
+        Supplier s = createTestSupplier("Tool Corp", null, null, null, null, null);
         service.assignSupplierToProduct(p.id(), s.id());
 
         // Create Sale
-        StockpileService.SaleDetails sale = service.createSale(new StockpileService.CreateSaleRequest(
-            List.of(new StockpileService.SaleItemRequest(p.id(), 5)),
+        SaleDetails sale = service.createSale(new CreateSaleRequest(
+            List.of(new SaleItemRequest(p.id(), 5)),
             500L,
             "UPI"
         ));
@@ -414,7 +417,7 @@ public class SupplierManagementTests {
         assertEquals(15, service.getProductById(p.id()).quantity());
 
         // Cancel Sale
-        StockpileService.SaleDetails cancelled = service.cancelSale(sale.id(), new StockpileService.CancelSaleRequest("Customer returned"));
+        SaleDetails cancelled = service.cancelSale(sale.id(), new CancelSaleRequest("Customer returned"));
         assertEquals("CANCELLED", cancelled.status());
         assertEquals(20, service.getProductById(p.id()).quantity()); // Restored
     }
@@ -422,8 +425,8 @@ public class SupplierManagementTests {
     @Test
     @DisplayName("20. Verify supplier and association persistence in database")
     void testDataPersistenceInDatabase() {
-        StockpileService.Supplier s = createTestSupplier("Persistent Vendor", "Amit", "9988776655", "amit@vendor.com", "Pune", "Trusted");
-        StockpileService.Product p = createTestProduct("Nail Pack", "NP-01", "Hardware", 200L, 500L, 100);
+        Supplier s = createTestSupplier("Persistent Vendor", "Amit", "9988776655", "amit@vendor.com", "Pune", "Trusted");
+        Product p = createTestProduct("Nail Pack", "NP-01", "Hardware", 200L, 500L, 100);
         service.assignSupplierToProduct(p.id(), s.id());
 
         // Query direct SQLite tables using raw SQL

@@ -1,5 +1,8 @@
 package com.stockpile;
 
+import com.stockpile.exception.*;
+import com.stockpile.model.*;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,34 +36,34 @@ public class StockpileController {
     }
 
     @GetMapping("/health")
-    public StockpileService.HealthStatus getHealth() {
+    public HealthStatus getHealth() {
         return stockpileService.checkHealth();
     }
 
     // --- Product Endpoints ---
 
     @GetMapping("/products")
-    public List<StockpileService.Product> getProducts(
+    public List<Product> getProducts(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String category) {
         return stockpileService.getProducts(search, category);
     }
 
     @GetMapping("/products/{id}")
-    public StockpileService.Product getProductById(@PathVariable Long id) {
+    public Product getProductById(@PathVariable Long id) {
         return stockpileService.getProductById(id);
     }
 
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.Product createProduct(@RequestBody StockpileService.CreateProductRequest req) {
+    public Product createProduct(@RequestBody CreateProductRequest req) {
         return stockpileService.createProduct(req);
     }
 
     @PutMapping("/products/{id}")
-    public StockpileService.Product updateProduct(
+    public Product updateProduct(
             @PathVariable Long id,
-            @RequestBody StockpileService.UpdateProductRequest req) {
+            @RequestBody UpdateProductRequest req) {
         return stockpileService.updateProduct(id, req);
     }
 
@@ -73,7 +76,7 @@ public class StockpileController {
     // --- Inventory Movements ---
 
     @GetMapping("/movements")
-    public List<StockpileService.RecentMovement> getMovements(
+    public List<RecentMovement> getMovements(
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String movementType,
             @RequestParam(required = false) String from,
@@ -87,36 +90,36 @@ public class StockpileController {
     }
 
     @GetMapping("/products/{id}/movements")
-    public List<StockpileService.RecentMovement> getProductMovements(@PathVariable Long id) {
+    public List<RecentMovement> getProductMovements(@PathVariable Long id) {
         return stockpileService.getMovements(id, null);
     }
 
     @PostMapping("/movements")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.RecentMovement recordMovement(@RequestBody StockpileService.CreateMovementRequest req) {
+    public RecentMovement recordMovement(@RequestBody CreateMovementRequest req) {
         return stockpileService.recordMovement(req);
     }
 
     @PostMapping("/inventory/stock-in")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.RecentMovement stockIn(@RequestBody StockpileService.CreateMovementRequest req) {
-        return stockpileService.recordMovement(new StockpileService.CreateMovementRequest(
+    public RecentMovement stockIn(@RequestBody CreateMovementRequest req) {
+        return stockpileService.recordMovement(new CreateMovementRequest(
             req.productId(), "IN", req.quantity(), req.reason()
         ));
     }
 
     @PostMapping("/inventory/stock-out")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.RecentMovement stockOut(@RequestBody StockpileService.CreateMovementRequest req) {
-        return stockpileService.recordMovement(new StockpileService.CreateMovementRequest(
+    public RecentMovement stockOut(@RequestBody CreateMovementRequest req) {
+        return stockpileService.recordMovement(new CreateMovementRequest(
             req.productId(), "OUT", req.quantity(), req.reason()
         ));
     }
 
     @PostMapping("/inventory/adjust")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.RecentMovement adjustStock(@RequestBody StockpileService.CreateMovementRequest req) {
-        return stockpileService.recordMovement(new StockpileService.CreateMovementRequest(
+    public RecentMovement adjustStock(@RequestBody CreateMovementRequest req) {
+        return stockpileService.recordMovement(new CreateMovementRequest(
             req.productId(), "ADJUSTMENT", req.quantity(), req.reason()
         ));
     }
@@ -124,7 +127,7 @@ public class StockpileController {
     // --- Dashboard Endpoint ---
 
     @GetMapping("/dashboard")
-    public StockpileService.DashboardResponse getDashboard(
+    public DashboardResponse getDashboard(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
@@ -134,12 +137,12 @@ public class StockpileController {
     // --- Inventory Intelligence Endpoints ---
 
     @GetMapping("/intelligence")
-    public List<StockpileService.ProductIntelligence> getInventoryIntelligence() {
+    public List<ProductIntelligence> getInventoryIntelligence() {
         return stockpileService.getInventoryIntelligence();
     }
 
     @GetMapping("/intelligence/sales")
-    public StockpileService.SalesIntelligenceResponse getSalesIntelligence() {
+    public SalesIntelligenceResponse getSalesIntelligence() {
         return stockpileService.getSalesIntelligence();
     }
 
@@ -147,12 +150,12 @@ public class StockpileController {
 
     @PostMapping("/sales")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.SaleDetails createSale(@RequestBody StockpileService.CreateSaleRequest req) {
+    public SaleDetails createSale(@RequestBody CreateSaleRequest req) {
         return stockpileService.createSale(req);
     }
 
     @GetMapping("/sales")
-    public List<StockpileService.SaleSummary> getSales(
+    public List<SaleSummary> getSales(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -165,50 +168,50 @@ public class StockpileController {
     }
 
     @GetMapping("/sales/summary")
-    public StockpileService.SalesMetricsSummary getSalesMetricsSummary() {
+    public SalesMetricsSummary getSalesMetricsSummary() {
         return stockpileService.getSalesMetricsSummary();
     }
 
     @GetMapping("/sales/trend")
-    public List<StockpileService.DailySalesTrend> getDailySalesTrend() {
+    public List<DailySalesTrend> getDailySalesTrend() {
         return stockpileService.getDailySalesTrend();
     }
 
     @GetMapping("/sales/{id}")
-    public StockpileService.SaleDetails getSaleById(@PathVariable Long id) {
+    public SaleDetails getSaleById(@PathVariable Long id) {
         return stockpileService.getSaleById(id);
     }
 
     @PostMapping("/sales/{id}/cancel")
-    public StockpileService.SaleDetails cancelSale(
+    public SaleDetails cancelSale(
             @PathVariable Long id,
-            @RequestBody StockpileService.CancelSaleRequest req) {
+            @RequestBody CancelSaleRequest req) {
         return stockpileService.cancelSale(id, req);
     }
 
     // --- Supplier Management Endpoints ---
 
     @GetMapping("/suppliers")
-    public List<StockpileService.Supplier> getSuppliers(
+    public List<Supplier> getSuppliers(
             @RequestParam(required = false) String search) {
         return stockpileService.getSuppliers(search);
     }
 
     @GetMapping("/suppliers/{id}")
-    public StockpileService.Supplier getSupplierById(@PathVariable Long id) {
+    public Supplier getSupplierById(@PathVariable Long id) {
         return stockpileService.getSupplierById(id);
     }
 
     @PostMapping("/suppliers")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.Supplier createSupplier(@RequestBody StockpileService.CreateSupplierRequest req) {
+    public Supplier createSupplier(@RequestBody CreateSupplierRequest req) {
         return stockpileService.createSupplier(req);
     }
 
     @PutMapping("/suppliers/{id}")
-    public StockpileService.Supplier updateSupplier(
+    public Supplier updateSupplier(
             @PathVariable Long id,
-            @RequestBody StockpileService.UpdateSupplierRequest req) {
+            @RequestBody UpdateSupplierRequest req) {
         return stockpileService.updateSupplier(id, req);
     }
 
@@ -219,9 +222,9 @@ public class StockpileController {
     }
 
     @PutMapping("/products/{productId}/supplier")
-    public StockpileService.Product assignSupplier(
+    public Product assignSupplier(
             @PathVariable Long productId,
-            @RequestBody StockpileService.AssignSupplierRequest req) {
+            @RequestBody AssignSupplierRequest req) {
         return stockpileService.assignSupplierToProduct(productId, req.supplierId());
     }
 
@@ -232,7 +235,7 @@ public class StockpileController {
     }
 
     @GetMapping("/suppliers/{id}/products")
-    public List<StockpileService.SupplierProduct> getSupplierProducts(@PathVariable Long id) {
+    public List<SupplierProduct> getSupplierProducts(@PathVariable Long id) {
         return stockpileService.getProductsBySupplier(id);
     }
 
@@ -240,12 +243,12 @@ public class StockpileController {
 
     @PostMapping("/purchase-orders")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.PurchaseOrderDetails createPurchaseOrder(@RequestBody StockpileService.CreatePurchaseOrderRequest req) {
+    public PurchaseOrderDetails createPurchaseOrder(@RequestBody CreatePurchaseOrderRequest req) {
         return stockpileService.createPurchaseOrder(req);
     }
 
     @GetMapping("/purchase-orders")
-    public List<StockpileService.PurchaseOrderSummary> getPurchaseOrders(
+    public List<PurchaseOrderSummary> getPurchaseOrders(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String from,
@@ -259,33 +262,33 @@ public class StockpileController {
     }
 
     @GetMapping("/purchase-orders/{id}")
-    public StockpileService.PurchaseOrderDetails getPurchaseOrderById(@PathVariable Long id) {
+    public PurchaseOrderDetails getPurchaseOrderById(@PathVariable Long id) {
         return stockpileService.getPurchaseOrderById(id);
     }
 
     @PutMapping("/purchase-orders/{id}")
-    public StockpileService.PurchaseOrderDetails updatePurchaseOrder(
+    public PurchaseOrderDetails updatePurchaseOrder(
             @PathVariable Long id,
-            @RequestBody StockpileService.UpdatePurchaseOrderRequest req) {
+            @RequestBody UpdatePurchaseOrderRequest req) {
         return stockpileService.updatePurchaseOrder(id, req);
     }
 
     @PostMapping("/purchase-orders/{id}/place")
-    public StockpileService.PurchaseOrderDetails placePurchaseOrder(@PathVariable Long id) {
+    public PurchaseOrderDetails placePurchaseOrder(@PathVariable Long id) {
         return stockpileService.placePurchaseOrder(id);
     }
 
     @PostMapping("/purchase-orders/{id}/receive")
-    public StockpileService.PurchaseOrderDetails receivePurchaseOrder(
+    public PurchaseOrderDetails receivePurchaseOrder(
             @PathVariable Long id,
-            @RequestBody StockpileService.ReceivePurchaseOrderRequest req) {
+            @RequestBody ReceivePurchaseOrderRequest req) {
         return stockpileService.receivePurchaseOrder(id, req);
     }
 
     @PostMapping("/purchase-orders/{id}/cancel")
-    public StockpileService.PurchaseOrderDetails cancelPurchaseOrder(
+    public PurchaseOrderDetails cancelPurchaseOrder(
             @PathVariable Long id,
-            @RequestBody StockpileService.CancelPurchaseOrderRequest req) {
+            @RequestBody CancelPurchaseOrderRequest req) {
         return stockpileService.cancelPurchaseOrder(id, req);
     }
 
@@ -293,18 +296,18 @@ public class StockpileController {
 
     @PostMapping("/stock-audits")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.StockAuditDetails createStockAudit(
-            @RequestBody(required = false) StockpileService.CreateStockAuditRequest req) {
+    public StockAuditDetails createStockAudit(
+            @RequestBody(required = false) CreateStockAuditRequest req) {
         return stockpileService.createStockAudit(req);
     }
 
     @GetMapping("/stock-audits/summary")
-    public StockpileService.StockAuditMetricsSummary getStockAuditSummary() {
+    public StockAuditMetricsSummary getStockAuditSummary() {
         return stockpileService.getStockAuditSummary();
     }
 
     @GetMapping("/stock-audits")
-    public List<StockpileService.StockAuditSummary> getStockAudits(
+    public List<StockAuditSummary> getStockAudits(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -317,34 +320,34 @@ public class StockpileController {
     }
 
     @GetMapping("/stock-audits/{id}")
-    public StockpileService.StockAuditDetails getStockAuditById(@PathVariable Long id) {
+    public StockAuditDetails getStockAuditById(@PathVariable Long id) {
         return stockpileService.getStockAuditById(id);
     }
 
     @PutMapping("/stock-audits/{auditId}/items/{itemId}")
-    public StockpileService.StockAuditItemDetails enterCount(
+    public StockAuditItemDetails enterCount(
             @PathVariable Long auditId,
             @PathVariable Long itemId,
-            @RequestBody StockpileService.EnterCountRequest req) {
+            @RequestBody EnterCountRequest req) {
         return stockpileService.enterCount(auditId, itemId, req);
     }
 
     @PostMapping("/stock-audits/{id}/complete")
-    public StockpileService.StockAuditCompletionSummary completeStockAudit(@PathVariable Long id) {
+    public StockAuditCompletionSummary completeStockAudit(@PathVariable Long id) {
         return stockpileService.completeStockAudit(id);
     }
 
     @PostMapping("/stock-audits/{id}/cancel")
-    public StockpileService.StockAuditDetails cancelStockAudit(
+    public StockAuditDetails cancelStockAudit(
             @PathVariable Long id,
-            @RequestBody StockpileService.CancelStockAuditRequest req) {
+            @RequestBody CancelStockAuditRequest req) {
         return stockpileService.cancelStockAudit(id, req);
     }
 
     // --- Financial Reports Endpoints ---
 
     @GetMapping("/reports/summary")
-    public StockpileService.FinancialSummaryReport getFinancialSummaryReport(
+    public FinancialSummaryReport getFinancialSummaryReport(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -355,7 +358,7 @@ public class StockpileController {
     }
 
     @GetMapping("/reports/profit-loss")
-    public StockpileService.ProfitLossReport getProfitLossReport(
+    public ProfitLossReport getProfitLossReport(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -366,7 +369,7 @@ public class StockpileController {
     }
 
     @GetMapping("/reports/sales")
-    public StockpileService.SalesReport getSalesReport(
+    public SalesReport getSalesReport(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -377,7 +380,7 @@ public class StockpileController {
     }
 
     @GetMapping("/reports/inventory-loss")
-    public StockpileService.InventoryLossReport getInventoryLossReport(
+    public InventoryLossReport getInventoryLossReport(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -388,7 +391,7 @@ public class StockpileController {
     }
 
     @GetMapping("/reports/purchases")
-    public StockpileService.PurchasesReport getPurchasesReport(
+    public PurchasesReport getPurchasesReport(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -402,14 +405,14 @@ public class StockpileController {
 
     @PostMapping("/expenses")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.ExpenseRecord createExpense(@RequestBody StockpileService.CreateExpenseRequest req) {
+    public ExpenseRecord createExpense(@RequestBody CreateExpenseRequest req) {
         return stockpileService.createExpense(req);
     }
 
     @PutMapping("/expenses/{id}")
-    public StockpileService.ExpenseRecord updateExpense(
+    public ExpenseRecord updateExpense(
             @PathVariable Long id,
-            @RequestBody StockpileService.CreateExpenseRequest req) {
+            @RequestBody CreateExpenseRequest req) {
         return stockpileService.updateExpense(id, req);
     }
 
@@ -420,7 +423,7 @@ public class StockpileController {
     }
 
     @GetMapping("/expenses")
-    public List<StockpileService.ExpenseRecord> getExpenses(
+    public List<ExpenseRecord> getExpenses(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -432,24 +435,24 @@ public class StockpileController {
         return stockpileService.getExpenses(category, from, to, pag != null ? pag[0] : null, pag != null ? pag[1] : null);
     }
 
-    public List<StockpileService.ExpenseRecord> getExpenses() {
+    public List<ExpenseRecord> getExpenses() {
         return getExpenses(null, null, null, null, null, null, null);
     }
 
     // --- Surplus Stock Management Endpoints ---
 
     @GetMapping("/surplus-listings/suggestions")
-    public List<StockpileService.SurplusSuggestion> getSurplusSuggestions() {
+    public List<SurplusSuggestion> getSurplusSuggestions() {
         return stockpileService.getSurplusSuggestions();
     }
 
     @GetMapping("/surplus-listings/summary")
-    public StockpileService.SurplusSummary getSurplusSummary() {
+    public SurplusSummary getSurplusSummary() {
         return stockpileService.getSurplusSummary();
     }
 
     @GetMapping("/surplus-listings")
-    public List<StockpileService.SurplusListingDetails> getSurplusListings(
+    public List<SurplusListingDetails> getSurplusListings(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String category,
@@ -463,65 +466,67 @@ public class StockpileController {
     }
 
     @GetMapping("/surplus-listings/{id}")
-    public StockpileService.SurplusListingDetails getSurplusListingById(@PathVariable Long id) {
+    public SurplusListingDetails getSurplusListingById(@PathVariable Long id) {
         return stockpileService.getSurplusListingById(id);
     }
 
     @PostMapping("/surplus-listings")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.SurplusListingDetails createSurplusListing(
-            @RequestBody StockpileService.CreateSurplusListingRequest req) {
+    public SurplusListingDetails createSurplusListing(
+            @RequestBody CreateSurplusListingRequest req) {
         return stockpileService.createSurplusListing(req);
     }
 
     @PostMapping("/surplus-listings/{id}/sell")
     @ResponseStatus(HttpStatus.CREATED)
-    public StockpileService.SaleDetails recordSurplusSale(
+    public SaleDetails recordSurplusSale(
             @PathVariable Long id,
-            @RequestBody StockpileService.RecordSurplusSaleRequest req) {
+            @RequestBody RecordSurplusSaleRequest req) {
         return stockpileService.recordSurplusSale(id, req);
     }
 
     @PutMapping("/surplus-listings/{id}")
-    public StockpileService.SurplusListingDetails updateSurplusListing(
+    public SurplusListingDetails updateSurplusListing(
             @PathVariable Long id,
-            @RequestBody StockpileService.UpdateSurplusListingRequest req) {
+            @RequestBody UpdateSurplusListingRequest req) {
         return stockpileService.updateSurplusListing(id, req);
     }
 
     @PostMapping("/surplus-listings/{id}/cancel")
-    public StockpileService.SurplusListingDetails cancelSurplusListing(
+    public SurplusListingDetails cancelSurplusListing(
             @PathVariable Long id,
-            @RequestBody StockpileService.CancelSurplusListingRequest req) {
+            @RequestBody CancelSurplusListingRequest req) {
         return stockpileService.cancelSurplusListing(id, req);
     }
 
     // --- Exception Handlers ---
 
     @ExceptionHandler({
-        StockpileService.ProductNotFoundException.class,
-        StockpileService.SaleNotFoundException.class,
-        StockpileService.SupplierNotFoundException.class,
-        StockpileService.PurchaseOrderNotFoundException.class,
-        StockpileService.StockAuditNotFoundException.class,
-        StockpileService.SurplusListingNotFoundException.class
+        ProductNotFoundException.class,
+        SaleNotFoundException.class,
+        SupplierNotFoundException.class,
+        PurchaseOrderNotFoundException.class,
+        StockAuditNotFoundException.class,
+        SurplusListingNotFoundException.class
     })
+    // OO: Polymorphism (runtime) — parameter parent RuntimeException type ka, andar alag-alag child exception objects aate hain; ek hi handler sabko serve karta hai.
     public ResponseEntity<Map<String, String>> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler({
-        StockpileService.ProductConflictException.class,
-        StockpileService.SaleConflictException.class,
-        StockpileService.SupplierConflictException.class,
-        StockpileService.PurchaseOrderConflictException.class,
-        StockpileService.StockAuditConflictException.class,
-        StockpileService.SurplusListingConflictException.class
+        ProductConflictException.class,
+        SaleConflictException.class,
+        SupplierConflictException.class,
+        PurchaseOrderConflictException.class,
+        StockAuditConflictException.class,
+        SurplusListingConflictException.class
     })
     public ResponseEntity<Map<String, String>> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
     }
 
+    // OO: Exception Handling — business layer throw karti hai, boundary (controller) catch karke meaningful HTTP status + JSON error banata hai.
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
